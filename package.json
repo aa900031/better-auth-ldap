@@ -1,0 +1,83 @@
+{
+	"name": "better-auth-ldap",
+	"type": "module",
+	"version": "0.0.0",
+	"packageManager": "pnpm@11.4.0",
+	"description": "LDAP sign-in plugin for Better Auth.",
+	"author": "zhong666 <hi@zhong666.me>",
+	"license": "MIT",
+	"homepage": "https://github.com/aa900031/better-auth-ldap#readme",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/aa900031/better-auth-ldap.git"
+	},
+	"bugs": {
+		"url": "https://github.com/aa900031/better-auth-ldap/issues"
+	},
+	"sideEffects": false,
+	"exports": {
+		".": "./src/index.ts",
+		"./client": "./src/client.ts",
+		"./package.json": "./package.json"
+	},
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.mjs",
+	"types": "./dist/index.d.cts",
+	"files": [
+		"dist"
+	],
+	"publishConfig": {
+		"access": "public",
+		"exports": {
+			".": {
+				"import": {
+					"types": "./dist/index.d.mts",
+					"default": "./dist/index.mjs"
+				},
+				"require": {
+					"types": "./dist/index.d.cts",
+					"default": "./dist/index.cjs"
+				}
+			},
+			"./client": {
+				"import": {
+					"types": "./dist/client.d.mts",
+					"default": "./dist/client.mjs"
+				},
+				"require": {
+					"types": "./dist/client.d.cts",
+					"default": "./dist/client.cjs"
+				}
+			},
+			"./package.json": "./package.json"
+		}
+	},
+	"scripts": {
+		"lint": "eslint . --cache --cache-location ./node_modules/.cache/eslint",
+		"release": "release-it",
+		"build": "tsdown",
+		"typecheck": "tsc --noEmit",
+		"test": "vitest run"
+	},
+	"peerDependencies": {
+		"better-auth": "^1.6.11"
+	},
+	"dependencies": {
+		"ldap-authentication": "^4.0.4",
+		"zod": "^4.4.3"
+	},
+	"devDependencies": {
+		"@aa900031/eslint-config": "^6.0.0",
+		"@aa900031/release-it-config": "^1.0.0",
+		"@aa900031/tsdown-config": "^0.2.1",
+		"@tsconfig/node24": "^24.0.4",
+		"@types/node": "^24.1.0",
+		"@vitest/coverage-istanbul": "^4.1.7",
+		"better-auth": "^1.6.11",
+		"eslint": "^9.39.3",
+		"release-it": "^20.0.1",
+		"tsdown": "^0.22.0",
+		"typescript": "^5.9.3",
+		"vitest": "^4.1.7"
+	}
+}

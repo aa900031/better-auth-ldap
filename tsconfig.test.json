@@ -1,0 +1,11 @@
+{
+	"extends": "./tsconfig.app.json",
+	"compilerOptions": {
+		"lib": []
+	},
+	"include": [
+		"src/**/*.ts",
+		"test/**/*.ts"
+	],
+	"exclude": []
+}

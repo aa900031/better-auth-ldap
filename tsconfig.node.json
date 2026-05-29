@@ -1,0 +1,17 @@
+{
+	"extends": "@tsconfig/node24/tsconfig.json",
+	"compilerOptions": {
+		"composite": false,
+		"tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo",
+		"types": [
+			"node"
+		],
+		"allowJs": true,
+		"declaration": false
+	},
+	"include": [
+		"eslint.config.ts",
+		"tsdown.config.ts",
+		"vitest.config.ts"
+	]
+}
