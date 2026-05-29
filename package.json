@@ -63,6 +63,7 @@
 		"better-auth": "^1.6.11"
 	},
 	"dependencies": {
+		"@better-auth/core": "^1.6.11",
 		"ldap-authentication": "^4.0.4",
 		"zod": "^4.4.3"
 	},
