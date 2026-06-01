@@ -10,11 +10,12 @@ import {
 	AUTH_RESULT_FAILURE_CREDENTIAL_INVALID,
 	AUTH_RESULT_FAILURE_IDENTITY_AMBIGUOUS,
 	AUTH_RESULT_FAILURE_IDENTITY_NOT_FOUND,
+	AUTH_RESULT_FAILURE_UNCATEGORIZED,
 	AUTH_RESULT_SUCCESS,
 	authenticateResult,
 } from 'ldap-authentication'
 import * as z from 'zod'
-import { LDAP_ERROR_CODES } from './error'
+import { LDAP_ERROR_CODES, LdapErrorCode } from './error'
 
 export { LDAP_ERROR_CODES } from './error'
 
@@ -54,18 +55,15 @@ export interface LdapMapProfileInput {
 	ctx: LdapEndpointContext
 }
 
-interface LdapProviderBaseConfig {
+export interface LdapProviderConfig {
 	providerId: string
+	ldap: LdapAuthenticationConfig
 	disableImplicitSignUp?: boolean | undefined
 	disableSignUp?: boolean | undefined
 	overrideUserInfo?: boolean | undefined
 	mapProfileToUser?:
 		| ((input: LdapMapProfileInput) => Awaitable<Partial<LdapUserInfo> | undefined>)
 		| undefined
-}
-
-export interface LdapProviderConfig extends LdapProviderBaseConfig {
-	ldap: LdapAuthenticationConfig
 }
 
 export interface LdapOptions {
@@ -95,7 +93,9 @@ const signInWithLdapBodySchema = z.object({
 	}),
 })
 
-export function ldap(options: LdapOptions): LdapPlugin {
+export function ldap(
+	options: LdapOptions,
+): LdapPlugin {
 	return {
 		id: 'ldap',
 		endpoints: {
@@ -106,7 +106,9 @@ export function ldap(options: LdapOptions): LdapPlugin {
 }
 
 // eslint-disable-next-line ts/explicit-function-return-type
-function signInWithLdap(options: LdapOptions) {
+function signInWithLdap(
+	options: LdapOptions
+) {
 	return createAuthEndpoint(
 		'/sign-in/ldap',
 		{
@@ -151,7 +153,7 @@ function signInWithLdap(options: LdapOptions) {
 				})
 			}
 
-			const profile = await authenticateLdapUser(providerConfig, {
+			const profile = await authenticateLdapUserProfile(providerConfig, {
 				ctx,
 				password: ctx.body.password,
 				username: ctx.body.username,
@@ -205,7 +207,7 @@ function signInWithLdap(options: LdapOptions) {
 	)
 }
 
-async function authenticateLdapUser(
+async function authenticateLdapUserProfile(
 	providerConfig: LdapProviderConfig,
 	input: {
 		ctx: LdapEndpointContext
@@ -243,7 +245,7 @@ async function authenticateLdapUser(
 		})
 	}
 
-	if (!isRecord(authenticationResult.user)) {
+	if (!isProfile(authenticationResult.user)) {
 		throw new APIError('UNAUTHORIZED', {
 			code: LDAP_ERROR_CODES.USER_INFO_MISSING,
 			message: 'LDAP user info is missing',
@@ -317,7 +319,10 @@ async function mapProfileToUser(
 	}
 }
 
-function getDefaultUserInfo(profile: LdapUserProfile, username: string): LdapUserInfo {
+function getDefaultUserInfo(
+	profile: LdapUserProfile,
+	username: string,
+): LdapUserInfo {
 	const id = getFirstString(profile, [
 		'dn',
 		'uid',
@@ -385,11 +390,15 @@ function normalizeString(value: unknown): string | undefined {
 	}
 }
 
-function isRecord(value: unknown): value is LdapUserProfile {
-	return typeof value === 'object' && value !== null && !Array.isArray(value)
+function isProfile(value: unknown): value is LdapUserProfile {
+	return typeof value === 'object'
+		&& value !== null
+		&& !Array.isArray(value)
 }
 
-function getAuthenticationErrorCode(code: number): (typeof LDAP_ERROR_CODES)[keyof typeof LDAP_ERROR_CODES] {
+function getAuthenticationErrorCode(
+	code: number
+): LdapErrorCode {
 	switch (code) {
 		case AUTH_RESULT_FAILURE_CREDENTIAL_INVALID:
 			return LDAP_ERROR_CODES.CREDENTIAL_INVALID
@@ -397,12 +406,16 @@ function getAuthenticationErrorCode(code: number): (typeof LDAP_ERROR_CODES)[key
 			return LDAP_ERROR_CODES.IDENTITY_NOT_FOUND
 		case AUTH_RESULT_FAILURE_IDENTITY_AMBIGUOUS:
 			return LDAP_ERROR_CODES.IDENTITY_AMBIGUOUS
+		case AUTH_RESULT_FAILURE_UNCATEGORIZED:
 		case AUTH_RESULT_FAILURE:
 		default:
 			return LDAP_ERROR_CODES.AUTHENTICATION_FAILED
 	}
 }
 
-function getErrorMessage(error: unknown, fallback: string): string {
+function getErrorMessage(
+	error: unknown,
+	fallback: string,
+): string {
 	return error instanceof Error ? error.message : fallback
 }
