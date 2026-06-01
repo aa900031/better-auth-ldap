@@ -1,6 +1,7 @@
 import type { GenericEndpointContext } from '@better-auth/core'
 import type { BetterAuthPlugin } from 'better-auth'
 import type { AuthenticationOptions } from 'ldap-authentication'
+import type { LdapErrorCode } from './error'
 import { Buffer } from 'node:buffer'
 import { APIError, createAuthEndpoint } from 'better-auth/api'
 import { setSessionCookie } from 'better-auth/cookies'
@@ -15,7 +16,7 @@ import {
 	authenticateResult,
 } from 'ldap-authentication'
 import * as z from 'zod'
-import { LDAP_ERROR_CODES, LdapErrorCode } from './error'
+import { LDAP_ERROR_CODES } from './error'
 
 export { LDAP_ERROR_CODES } from './error'
 
@@ -107,7 +108,7 @@ export function ldap(
 
 // eslint-disable-next-line ts/explicit-function-return-type
 function signInWithLdap(
-	options: LdapOptions
+	options: LdapOptions,
 ) {
 	return createAuthEndpoint(
 		'/sign-in/ldap',
@@ -397,7 +398,7 @@ function isProfile(value: unknown): value is LdapUserProfile {
 }
 
 function getAuthenticationErrorCode(
-	code: number
+	code: number,
 ): LdapErrorCode {
 	switch (code) {
 		case AUTH_RESULT_FAILURE_CREDENTIAL_INVALID:
