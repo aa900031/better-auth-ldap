@@ -29,10 +29,7 @@ export const auth = betterAuth({
 							url: 'ldap://ldap.example.com',
 						},
 						user: {
-							search: {
-								baseDn: ({ username }) => `uid=${username},ou=people,dc=example,dc=com`,
-								attributes: ['dn', 'mail', 'cn', 'displayName'],
-							},
+							dn: ({ username }) => `uid=${username},ou=people,dc=example,dc=com`,
 						},
 					},
 				},
@@ -79,8 +76,8 @@ interface LdapSignInResponse {
 
 The plugin supports two config shapes:
 
-- Admin mode: configure `admin` and `user.search`. The plugin binds as admin, searches the user entry, validates the end-user password with the resolved `user.dn`, then runs optional group lookup with the admin client.
-- Self mode: omit `admin` and provide `user.dn` plus `user.search`. The plugin binds as the user first, then runs optional profile/group searches with the user client.
+- Admin mode: configure `admin`, then provide either `user.search`, `user.dn`, or both. The plugin binds as admin, searches the user entry, validates the end-user password with the resolved `user.dn`, then runs optional group lookup with the admin client.
+- Self mode: omit `admin` and provide `user.dn`. `user.search` is optional. The plugin binds as the user first, then runs optional profile/group searches with the user client.
 
 ```ts
 import { ldap } from 'better-auth-ldap'
@@ -108,10 +105,12 @@ ldap({
 
 ## Search Defaults
 
-- `user.search` is required.
 - `user.search.scope` defaults to `'base'`.
 - `group.search.scope` defaults to `'sub'`.
+- `user.search` is optional.
 - `user.search.baseDn` may be omitted. When omitted, the plugin falls back to `user.dn`.
+- If `user.search` is omitted entirely, the plugin still does a base-scope read against `user.dn`.
+- In admin mode, at least one of `user.search.baseDn` or `user.dn` must be resolvable.
 - `filter` is optional on both `user.search` and `group.search`. If omitted, `ldapts` falls back to `(objectclass=*)`.
 - `user.search` must resolve to exactly one entry. Zero results returns `IDENTITY_NOT_FOUND`; multiple results returns `IDENTITY_AMBIGUOUS`.
 - `group.search` results are attached to `profile.groups`.
@@ -138,7 +137,7 @@ ldap({
 				},
 				user: {
 					search: {
-						baseDn: ({ username }) => `uid=${username},ou=employees,dc=example,dc=com`,
+						baseDn: ({ userDn, username }) => userDn ?? `uid=${username},ou=employees,dc=example,dc=com`,
 						attributes: ['dn', 'mail', 'cn'],
 					},
 				},

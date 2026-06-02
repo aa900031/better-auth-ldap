@@ -217,6 +217,148 @@ describe('ldap internal helpers', () => {
 		)
 	})
 
+	it('authenticates in self mode when user.search is omitted', async () => {
+		mocks.bindQueue.push({})
+		mocks.searchQueue.push({
+			result: {
+				searchEntries: [
+					{
+						cn: 'Mark Lee',
+						dn: 'uid=mark,ou=people,dc=example,dc=com',
+						mail: 'mark@example.com',
+					},
+				],
+				searchReferences: [],
+			},
+		})
+
+		const profile = await authenticateLdapUserProfile(createSelfProviderConfig({
+			ldap: {
+				connection: {
+					tlsOptions: {
+						rejectUnauthorized: false,
+					},
+					url: 'ldaps://ldap.example.com',
+				},
+				user: {
+					dn: ({ username }) => `uid=${username},ou=people,dc=example,dc=com`,
+				},
+			},
+		}), {
+			ctx,
+			password: 'password',
+			username: 'mark',
+		})
+
+		expect(profile).toEqual({
+			cn: 'Mark Lee',
+			dn: 'uid=mark,ou=people,dc=example,dc=com',
+			mail: 'mark@example.com',
+		})
+
+		expect(mocks.clients[0]!.search).toHaveBeenCalledWith(
+			'uid=mark,ou=people,dc=example,dc=com',
+			expect.objectContaining({
+				scope: 'base',
+			}),
+		)
+	})
+
+	it('passes resolved user.dn to the user.search.baseDn resolver', async () => {
+		let receivedUserDn: string | undefined
+		mocks.bindQueue.push({})
+		mocks.searchQueue.push({
+			result: {
+				searchEntries: [
+					{
+						cn: 'Mark Lee',
+						dn: 'uid=mark,ou=people,dc=example,dc=com',
+						mail: 'mark@example.com',
+					},
+				],
+				searchReferences: [],
+			},
+		})
+
+		await authenticateLdapUserProfile(createSelfProviderConfig({
+			ldap: {
+				connection: {
+					tlsOptions: {
+						rejectUnauthorized: false,
+					},
+					url: 'ldaps://ldap.example.com',
+				},
+				user: {
+					dn: ({ username }) => `uid=${username},ou=people,dc=example,dc=com`,
+					search: {
+						baseDn: ({ userDn }) => {
+							receivedUserDn = userDn
+							return userDn ?? ''
+						},
+					},
+				},
+			},
+		}), {
+			ctx,
+			password: 'password',
+			username: 'mark',
+		})
+
+		expect(receivedUserDn).toBe('uid=mark,ou=people,dc=example,dc=com')
+	})
+
+	it('authenticates in admin mode when user.search is omitted and falls back to user.dn', async () => {
+		mocks.bindQueue.push({}, {})
+		mocks.searchQueue.push({
+			result: {
+				searchEntries: [
+					{
+						cn: 'Mark Lee',
+						dn: 'uid=mark,ou=people,dc=example,dc=com',
+						mail: 'mark@example.com',
+					},
+				],
+				searchReferences: [],
+			},
+		})
+
+		const profile = await authenticateLdapUserProfile(createAdminProviderConfig({
+			ldap: {
+				connection: {
+					startTLS: true,
+					tlsOptions: {
+						rejectUnauthorized: false,
+					},
+					url: 'ldap://ldap.example.com',
+				},
+				admin: {
+					dn: 'cn=read-only-admin,dc=example,dc=com',
+					password: 'admin-password',
+				},
+				user: {
+					dn: ({ username }) => `uid=${username},ou=people,dc=example,dc=com`,
+				},
+			},
+		}), {
+			ctx,
+			password: 'password',
+			username: 'mark',
+		})
+
+		expect(profile).toEqual({
+			cn: 'Mark Lee',
+			dn: 'uid=mark,ou=people,dc=example,dc=com',
+			mail: 'mark@example.com',
+		})
+
+		expect(mocks.clients[0]!.search).toHaveBeenCalledWith(
+			'uid=mark,ou=people,dc=example,dc=com',
+			expect.objectContaining({
+				scope: 'base',
+			}),
+		)
+	})
+
 	it('maps invalid credentials to the expected API error code', async () => {
 		mocks.bindQueue.push({
 			error: new InvalidCredentialsError('invalid credentials'),
@@ -260,6 +402,37 @@ describe('ldap internal helpers', () => {
 			body: {
 				code: LDAP_ERROR_CODES.IDENTITY_AMBIGUOUS,
 				message: 'Invalid LDAP credentials',
+			},
+		})
+	})
+
+	it('rejects admin mode without user.search and user.dn', async () => {
+		mocks.bindQueue.push({})
+
+		await expectApiError(authenticateLdapUserProfile(createAdminProviderConfig({
+			ldap: {
+				connection: {
+					startTLS: true,
+					tlsOptions: {
+						rejectUnauthorized: false,
+					},
+					url: 'ldap://ldap.example.com',
+				},
+				admin: {
+					dn: 'cn=read-only-admin,dc=example,dc=com',
+					password: 'admin-password',
+				},
+				user: {},
+			},
+		}), {
+			ctx,
+			password: 'password',
+			username: 'mark',
+		}), {
+			status: 'BAD_REQUEST',
+			body: {
+				code: LDAP_ERROR_CODES.AUTHENTICATION_FAILED,
+				message: 'LDAP user.search.baseDn or user.dn is required',
 			},
 		})
 	})

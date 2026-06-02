@@ -45,7 +45,7 @@ export async function authenticateLdapUserProfile(
 			const profile = await searchForSingleUserProfile(
 				adminClient,
 				providerConfig.ldap.user.search,
-				createRuntimeCredentials(providerConfig, input),
+				createUserSearchResolverInput(providerConfig, input, fallbackUserDn),
 				fallbackUserDn,
 			)
 
@@ -60,7 +60,7 @@ export async function authenticateLdapUserProfile(
 					adminClient,
 					providerConfig.ldap.user.group.search,
 					{
-						...createRuntimeCredentials(providerConfig, input),
+						...createUserSearchResolverInput(providerConfig, input),
 						profile,
 						userDn: profile.dn,
 					},
@@ -81,7 +81,7 @@ export async function authenticateLdapUserProfile(
 			const profile = await searchForSingleUserProfile(
 				userClient,
 				providerConfig.ldap.user.search,
-				createRuntimeCredentials(providerConfig, input),
+				createUserSearchResolverInput(providerConfig, input, userDn),
 				userDn,
 			)
 
@@ -90,7 +90,7 @@ export async function authenticateLdapUserProfile(
 					userClient,
 					providerConfig.ldap.user.group.search,
 					{
-						...createRuntimeCredentials(providerConfig, input),
+						...createUserSearchResolverInput(providerConfig, input),
 						profile,
 						userDn: profile.dn,
 					},
@@ -329,12 +329,13 @@ async function createBoundClient(
 
 async function searchForSingleUserProfile(
 	client: Client,
-	searchConfig: LdapUserSearchConfig,
+	searchConfig: LdapUserSearchConfig | undefined,
 	input: LdapUserSearchResolverInput,
 	fallbackBaseDN?: string,
 ): Promise<LdapUserProfile> {
-	const baseDn = await resolveUserSearchBaseDN(searchConfig, input, fallbackBaseDN)
-	const searchOptions = await resolveSearchOptions(searchConfig, input, 'base')
+	const resolvedSearchConfig = searchConfig ?? {}
+	const baseDn = await resolveUserSearchBaseDN(resolvedSearchConfig, input, fallbackBaseDN)
+	const searchOptions = await resolveSearchOptions(resolvedSearchConfig, input, 'base')
 
 	let searchEntries
 	try {
@@ -440,19 +441,21 @@ async function resolveFilter<TInput>(
 	return filter
 }
 
-function createRuntimeCredentials(
+function createUserSearchResolverInput(
 	providerConfig: LdapProviderConfig,
 	input: {
 		ctx: LdapEndpointContext
 		password: string
 		username: string
 	},
+	userDn?: string,
 ): LdapUserSearchResolverInput {
 	return {
 		ctx: input.ctx,
 		password: input.password,
 		providerId: providerConfig.providerId,
 		username: input.username,
+		userDn,
 	}
 }
 

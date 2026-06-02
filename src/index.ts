@@ -39,7 +39,9 @@ export interface LdapRuntimeCredentials {
 
 export interface LdapUserDnResolverInput extends Omit<LdapRuntimeCredentials, 'password'> {}
 
-export interface LdapUserSearchResolverInput extends LdapRuntimeCredentials {}
+export interface LdapUserSearchResolverInput extends LdapRuntimeCredentials {
+	userDn?: string | undefined
+}
 
 export interface LdapGroupSearchResolverInput extends LdapRuntimeCredentials {
 	userDn: string
@@ -74,8 +76,8 @@ export interface LdapUserGroupConfig {
 }
 
 export interface LdapUserConfigBase {
-	search: LdapUserSearchConfig
-	group?: LdapUserGroupConfig | undefined
+	search?: LdapUserSearchConfig
+	group?: LdapUserGroupConfig
 }
 
 export interface LdapAdminUserConfig extends LdapUserConfigBase {
