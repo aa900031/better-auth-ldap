@@ -1,4 +1,3 @@
-import pkg from '../package.json' with { type: 'json' }
 import type { GenericEndpointContext } from '@better-auth/core'
 import type { BetterAuthPlugin } from 'better-auth'
 import type { ClientOptions, Entry, Filter, SearchOptions } from 'ldapts'
@@ -6,6 +5,7 @@ import { APIError, createAuthEndpoint } from 'better-auth/api'
 import { setSessionCookie } from 'better-auth/cookies'
 import { handleOAuthUserInfo } from 'better-auth/oauth2'
 import * as z from 'zod'
+import pkg from '../package.json' with { type: 'json' }
 import { LDAP_ERROR_CODES } from './error'
 import { authenticateLdapUserProfile, mapProfileToUser } from './internal'
 
