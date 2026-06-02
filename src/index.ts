@@ -1,3 +1,4 @@
+import pkg from '../package.json' with { type: 'json' }
 import type { GenericEndpointContext } from '@better-auth/core'
 import type { BetterAuthPlugin } from 'better-auth'
 import type { ClientOptions, Entry, Filter, SearchOptions } from 'ldapts'
@@ -151,6 +152,7 @@ export function ldap(
 ): LdapPlugin {
 	return {
 		id: 'ldap',
+		version: pkg.version,
 		endpoints: {
 			signInWithLdap: signInWithLdap(options),
 		},
