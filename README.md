@@ -2,14 +2,14 @@
 
 [![npm version](https://img.shields.io/npm/v/better-auth-ldap?style=flat&colorA=18181B&colorB=F0DB4F)](https://npmjs.com/package/better-auth-ldap)
 
-LDAP sign-in plugin for [Better Auth](https://better-auth.com) powered by [`ldap-authentication`](https://github.com/shaozi/ldap-authentication).
+LDAP sign-in plugin for [Better Auth](https://better-auth.com) powered by `ldapts`.
 
 ## Usage
 
 Install the package.
 
 ```shell
-pnpm install better-auth-ldap ldap-authentication
+pnpm install better-auth-ldap
 ```
 
 Add the server plugin to your Better Auth config.
@@ -25,14 +25,15 @@ export const auth = betterAuth({
 				{
 					providerId: 'corp',
 					ldap: {
-						ldapOpts: {
+						connection: {
 							url: 'ldap://ldap.example.com',
 						},
-						adminDn: 'cn=read-only-admin,dc=example,dc=com',
-						adminPassword: process.env.LDAP_ADMIN_PASSWORD,
-						userSearchBase: 'dc=example,dc=com',
-						usernameAttribute: 'uid',
-						attributes: ['dn', 'uid', 'mail', 'cn', 'displayName'],
+						user: {
+							search: {
+								baseDn: ({ username }) => `uid=${username},ou=people,dc=example,dc=com`,
+								attributes: ['dn', 'mail', 'cn', 'displayName'],
+							},
+						},
 					},
 				},
 			],
@@ -74,30 +75,87 @@ interface LdapSignInResponse {
 }
 ```
 
+## Auth Modes
+
+The plugin supports two config shapes:
+
+- Admin mode: configure `admin` and `user.search`. The plugin binds as admin, searches the user entry, validates the end-user password with the resolved `user.dn`, then runs optional group lookup with the admin client.
+- Self mode: omit `admin` and provide `user.dn` plus `user.search`. The plugin binds as the user first, then runs optional profile/group searches with the user client.
+
+```ts
+import { ldap } from 'better-auth-ldap'
+
+ldap({
+	config: [
+		{
+			providerId: 'contractors',
+			ldap: {
+				connection: {
+					url: 'ldaps://ldap.example.com',
+				},
+				user: {
+					dn: ({ username }) => `uid=${username},ou=contractors,dc=example,dc=com`,
+					search: {
+						// If baseDn is omitted, the resolved user.dn is used.
+						attributes: ['dn', 'mail', 'cn'],
+					},
+				},
+			},
+		},
+	],
+})
+```
+
+## Search Defaults
+
+- `user.search` is required.
+- `user.search.scope` defaults to `'base'`.
+- `group.search.scope` defaults to `'sub'`.
+- `user.search.baseDn` may be omitted. When omitted, the plugin falls back to `user.dn`.
+- `filter` is optional on both `user.search` and `group.search`. If omitted, `ldapts` falls back to `(objectclass=*)`.
+- `user.search` must resolve to exactly one entry. Zero results returns `IDENTITY_NOT_FOUND`; multiple results returns `IDENTITY_AMBIGUOUS`.
+- `group.search` results are attached to `profile.groups`.
+
 ## Multiple Providers
 
 Use one config entry per LDAP directory. The request body selects the provider with `providerId`.
 
 ```ts
+import { ldap } from 'better-auth-ldap'
+
 ldap({
 	config: [
 		{
 			providerId: 'employees',
 			ldap: {
-				ldapOpts: { url: 'ldaps://employees.example.com' },
-				adminDn: process.env.EMPLOYEES_LDAP_ADMIN_DN,
-				adminPassword: process.env.EMPLOYEES_LDAP_ADMIN_PASSWORD,
-				userSearchBase: 'ou=employees,dc=example,dc=com',
-				usernameAttribute: 'uid',
+				connection: {
+					url: 'ldap://employees.example.com',
+					startTLS: true,
+				},
+				admin: {
+					dn: process.env.EMPLOYEES_LDAP_ADMIN_DN!,
+					password: process.env.EMPLOYEES_LDAP_ADMIN_PASSWORD!,
+				},
+				user: {
+					search: {
+						baseDn: ({ username }) => `uid=${username},ou=employees,dc=example,dc=com`,
+						attributes: ['dn', 'mail', 'cn'],
+					},
+				},
 			},
 		},
 		{
 			providerId: 'contractors',
 			ldap: {
-				ldapOpts: { url: 'ldap://contractors.example.com' },
-				userSearchBase: 'ou=contractors,dc=example,dc=com',
-				usernameAttribute: 'uid',
-				userDn: ({ username }) => `uid=${username},ou=contractors,dc=example,dc=com`,
+				connection: {
+					url: 'ldaps://contractors.example.com',
+				},
+				user: {
+					dn: ({ username }) => `uid=${username},ou=contractors,dc=example,dc=com`,
+					search: {
+						attributes: ['dn', 'mail', 'cn'],
+					},
+				},
 			},
 		},
 	],
@@ -107,15 +165,25 @@ ldap({
 Dynamic callbacks receive a typed Better Auth endpoint context.
 
 ```ts
-import type { LdapEndpointContext } from 'better-auth-ldap'
+import type { LdapEndpointContext, LdapUserDnResolverInput } from 'better-auth-ldap'
+import { ldap } from 'better-auth-ldap'
 
-function resolveUserDn({ ctx, username }: { ctx: LdapEndpointContext, username: string }) {
-	const peopleDn = ctx.context.baseURL.includes('staging')
-		? 'ou=staging,dc=example,dc=com'
-		: 'ou=people,dc=example,dc=com'
+ldap({
+	config: [
+		{
+			providerId: 'corp',
+			user: {
+				dn: ({ ctx, username }) => {
+					const peopleDn = ctx.context.baseURL.includes('staging')
+						? 'ou=staging,dc=example,dc=com'
+						: 'ou=people,dc=example,dc=com'
 
-	return `uid=${username},${peopleDn}`
-}
+					return `uid=${username},${peopleDn}`
+				}
+			},
+		}
+	]
+})
 ```
 
 ## User Mapping
@@ -136,11 +204,20 @@ ldap({
 		{
 			providerId: 'corp',
 			ldap: {
-				ldapOpts: { url: 'ldap://ldap.example.com' },
-				adminDn: process.env.LDAP_ADMIN_DN,
-				adminPassword: process.env.LDAP_ADMIN_PASSWORD,
-				userSearchBase: 'dc=example,dc=com',
-				usernameAttribute: 'sAMAccountName',
+				connection: {
+					url: 'ldap://ldap.example.com',
+					startTLS: true,
+				},
+				admin: {
+					dn: process.env.LDAP_ADMIN_DN!,
+					password: resolveAdminPassword,
+				},
+				user: {
+					search: {
+						baseDn: ({ username }) => `uid=${username},ou=people,dc=example,dc=com`,
+						attributes: ['dn', 'mail', 'cn', 'displayName', 'objectGUID'],
+					},
+				},
 			},
 			mapProfileToUser: ({ profile, username }) => ({
 				id: String(profile.objectGUID || profile.dn || username),
@@ -150,6 +227,35 @@ ldap({
 			}),
 		},
 	],
+})
+```
+
+## Advanced Filters
+
+If you want structured filters instead of strings, pass any `ldapts` `Filter` instance from a resolver.
+
+```ts
+import { EqualityFilter } from 'ldapts'
+import { ldap } from 'better-auth-ldap'
+
+ldap({
+	config: [
+		{
+			providerId: 'corp',
+			user: {
+				dn: ({ username }) => `uid=${username},ou=contractors,dc=example,dc=com`,
+				group: {
+					search: {
+						baseDn: 'ou=groups,dc=example,dc=com',
+						filter: ({ userDn }) => new EqualityFilter({
+							attribute: 'member',
+							value: userDn,
+						}),
+					},
+				}
+			},
+		}
+	]
 })
 ```
 

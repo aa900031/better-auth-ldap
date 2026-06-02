@@ -1,27 +1,77 @@
 import type { LdapEndpointContext, LdapProviderConfig } from './index'
 import { APIError } from 'better-auth/api'
-import { AUTH_RESULT_FAILURE_CREDENTIAL_INVALID } from 'ldap-authentication'
+import { InvalidCredentialsError } from 'ldapts'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { LDAP_ERROR_CODES } from './error'
 import {
 	authenticateLdapUserProfile,
 	getDefaultUserInfo,
 	mapProfileToUser,
-	resolveAuthenticationOptions,
 } from './internal'
 
 const mocks = vi.hoisted(() => {
 	return {
-		authenticateResult: vi.fn(),
+		bindQueue: [] as Array<{ error?: unknown }>,
+		clients: [] as Array<{
+			bind: ReturnType<typeof vi.fn>
+			isConnected: boolean
+			options: Record<string, unknown>
+			search: ReturnType<typeof vi.fn>
+			startTLS: ReturnType<typeof vi.fn>
+			unbind: ReturnType<typeof vi.fn>
+		}>,
+		searchQueue: [] as Array<{
+			error?: unknown
+			result?: {
+				searchEntries: Array<Record<string, unknown> & { dn: string }>
+				searchReferences: string[]
+			}
+		}>,
 	}
 })
 
-vi.mock('ldap-authentication', async () => {
-	const actual = await vi.importActual<typeof import('ldap-authentication')>('ldap-authentication')
+vi.mock('ldapts', async () => {
+	const actual = await vi.importActual<typeof import('ldapts')>('ldapts')
+
+	class MockClient {
+		public bind = vi.fn(async () => {
+			const next = mocks.bindQueue.shift()
+			if (next?.error) {
+				throw next.error
+			}
+		})
+
+		public isConnected = true
+
+		public options: Record<string, unknown>
+
+		public search = vi.fn(async () => {
+			const next = mocks.searchQueue.shift()
+			if (next?.error) {
+				throw next.error
+			}
+
+			return next?.result ?? {
+				searchEntries: [],
+				searchReferences: [],
+			}
+		})
+
+		public startTLS = vi.fn(async () => undefined)
+
+		public unbind = vi.fn(async () => {
+			this.isConnected = false
+		})
+
+		public constructor(options: Record<string, unknown>) {
+			this.options = options
+			mocks.clients.push(this)
+		}
+	}
 
 	return {
 		...actual,
-		authenticateResult: mocks.authenticateResult,
+		Client: MockClient,
 	}
 })
 
@@ -31,72 +81,211 @@ const ctx = {
 	},
 } as LdapEndpointContext
 
-function createProviderConfig(
-	overrides: Partial<LdapProviderConfig> = {},
-): LdapProviderConfig {
-	return {
-		providerId: 'corp',
-		ldap: {
-			ldapOpts: {
-				url: 'ldap://ldap.example.com',
-			},
-		},
-		...overrides,
-	}
-}
-
 describe('ldap internal helpers', () => {
 	beforeEach(() => {
+		mocks.bindQueue.length = 0
+		mocks.clients.length = 0
+		mocks.searchQueue.length = 0
 		vi.clearAllMocks()
 	})
 
-	it('resolves LDAP options with credentials and a dynamic userDn callback', async () => {
-		const providerConfig = createProviderConfig({
-			ldap: {
-				ldapOpts: {
-					url: 'ldap://ldap.example.com',
+	it('authenticates in admin mode and performs user and group searches with the expected defaults', async () => {
+		mocks.bindQueue.push({}, {})
+		mocks.searchQueue.push(
+			{
+				result: {
+					searchEntries: [
+						{
+							cn: 'Mark Lee',
+							dn: 'uid=mark,ou=people,dc=example,dc=com',
+							mail: 'mark@example.com',
+						},
+					],
+					searchReferences: [],
 				},
-				userDn: ({ username }) => `uid=${username},ou=people,dc=example,dc=com`,
 			},
-		})
+			{
+				result: {
+					searchEntries: [
+						{
+							cn: 'Engineering',
+							dn: 'cn=engineering,ou=groups,dc=example,dc=com',
+						},
+					],
+					searchReferences: [],
+				},
+			},
+		)
 
-		const options = await resolveAuthenticationOptions(providerConfig, {
+		const profile = await authenticateLdapUserProfile(createAdminProviderConfig(), {
 			ctx,
 			password: 'password',
 			username: 'mark',
 		})
 
-		expect(options).toEqual({
-			ldapOpts: {
-				url: 'ldap://ldap.example.com',
+		expect(profile).toEqual({
+			cn: 'Mark Lee',
+			dn: 'uid=mark,ou=people,dc=example,dc=com',
+			groups: [
+				{
+					cn: 'Engineering',
+					dn: 'cn=engineering,ou=groups,dc=example,dc=com',
+				},
+			],
+			mail: 'mark@example.com',
+		})
+
+		expect(mocks.clients).toHaveLength(2)
+		expect(mocks.clients[0]!.options).toEqual({
+			url: 'ldap://ldap.example.com',
+		})
+		expect(mocks.clients[0]!.startTLS).toHaveBeenCalledWith({
+			rejectUnauthorized: false,
+		})
+		expect(mocks.clients[0]!.bind).toHaveBeenCalledWith(
+			'cn=read-only-admin,dc=example,dc=com',
+			'admin-password',
+		)
+		expect(mocks.clients[0]!.search).toHaveBeenNthCalledWith(
+			1,
+			'uid=mark,ou=people,dc=example,dc=com',
+			expect.objectContaining({
+				attributes: ['dn', 'mail', 'cn'],
+				scope: 'base',
+			}),
+		)
+		expect(mocks.clients[0]!.search).toHaveBeenNthCalledWith(
+			2,
+			'ou=groups,dc=example,dc=com',
+			expect.objectContaining({
+				filter: '(member=uid=mark,ou=people,dc=example,dc=com)',
+				scope: 'sub',
+			}),
+		)
+		expect(mocks.clients[1]!.bind).toHaveBeenCalledWith(
+			'uid=mark,ou=people,dc=example,dc=com',
+			'password',
+		)
+		expect(mocks.clients[1]!.search).not.toHaveBeenCalled()
+	})
+
+	it('authenticates in self mode and falls back to user.dn when user.search.baseDn is omitted', async () => {
+		mocks.bindQueue.push({})
+		mocks.searchQueue.push({
+			result: {
+				searchEntries: [
+					{
+						cn: 'Mark Lee',
+						dn: 'uid=mark,ou=people,dc=example,dc=com',
+						mail: 'mark@example.com',
+					},
+				],
+				searchReferences: [],
 			},
-			userDn: 'uid=mark,ou=people,dc=example,dc=com',
+		})
+
+		const profile = await authenticateLdapUserProfile(createSelfProviderConfig(), {
+			ctx,
+			password: 'password',
 			username: 'mark',
-			userPassword: 'password',
+		})
+
+		expect(profile).toEqual({
+			cn: 'Mark Lee',
+			dn: 'uid=mark,ou=people,dc=example,dc=com',
+			mail: 'mark@example.com',
+		})
+
+		expect(mocks.clients).toHaveLength(1)
+		expect(mocks.clients[0]!.options).toEqual({
+			tlsOptions: {
+				rejectUnauthorized: false,
+			},
+			url: 'ldaps://ldap.example.com',
+		})
+		expect(mocks.clients[0]!.startTLS).not.toHaveBeenCalled()
+		expect(mocks.clients[0]!.bind).toHaveBeenCalledWith(
+			'uid=mark,ou=people,dc=example,dc=com',
+			'password',
+		)
+		expect(mocks.clients[0]!.search).toHaveBeenCalledWith(
+			'uid=mark,ou=people,dc=example,dc=com',
+			expect.objectContaining({
+				attributes: ['dn', 'mail', 'cn'],
+				scope: 'base',
+			}),
+		)
+	})
+
+	it('maps invalid credentials to the expected API error code', async () => {
+		mocks.bindQueue.push({
+			error: new InvalidCredentialsError('invalid credentials'),
+		})
+
+		await expectApiError(authenticateLdapUserProfile(createSelfProviderConfig(), {
+			ctx,
+			password: 'wrong-password',
+			username: 'mark',
+		}), {
+			status: 'UNAUTHORIZED',
+			body: {
+				code: LDAP_ERROR_CODES.CREDENTIAL_INVALID,
+				message: 'Invalid LDAP credentials',
+			},
+		})
+	})
+
+	it('rejects ambiguous user search results', async () => {
+		mocks.bindQueue.push({})
+		mocks.searchQueue.push({
+			result: {
+				searchEntries: [
+					{
+						dn: 'uid=mark,ou=people,dc=example,dc=com',
+					},
+					{
+						dn: 'uid=mark2,ou=people,dc=example,dc=com',
+					},
+				],
+				searchReferences: [],
+			},
+		})
+
+		await expectApiError(authenticateLdapUserProfile(createSelfProviderConfig(), {
+			ctx,
+			password: 'password',
+			username: 'mark',
+		}), {
+			status: 'UNAUTHORIZED',
+			body: {
+				code: LDAP_ERROR_CODES.IDENTITY_AMBIGUOUS,
+				message: 'Invalid LDAP credentials',
+			},
 		})
 	})
 
 	it('derives default user info from preferred LDAP fields and binary photos', () => {
 		const userInfo = getDefaultUserInfo(
 			{
-				'userPrincipalName': [' ', 'MARK@EXAMPLE.COM'],
-				'displayName': 'Mark Lee',
-				'thumbnailPhoto;binary': Uint8Array.from([1, 2, 3]),
+				displayName: 'Mark Lee',
+				dn: 'uid=mark,ou=people,dc=example,dc=com',
+				thumbnailPhoto: Uint8Array.from([1, 2, 3]),
+				userPrincipalName: [' ', 'MARK@EXAMPLE.COM'],
 			},
 			'mark',
 		)
 
 		expect(userInfo).toEqual({
-			id: 'MARK@EXAMPLE.COM',
 			email: 'MARK@EXAMPLE.COM',
-			name: 'Mark Lee',
 			emailVerified: false,
+			id: 'uid=mark,ou=people,dc=example,dc=com',
 			image: 'AQID',
+			name: 'Mark Lee',
 		})
 	})
 
 	it('merges mapped fields with defaults and normalizes email casing', async () => {
-		const providerConfig = createProviderConfig({
+		const providerConfig = createSelfProviderConfig({
 			mapProfileToUser: async () => ({
 				name: 'Mark Lee',
 				id: 'directory-guid',
@@ -127,9 +316,10 @@ describe('ldap internal helpers', () => {
 	})
 
 	it('rejects mapped users without an email address', async () => {
-		await expectApiError(mapProfileToUser(createProviderConfig(), {
+		await expectApiError(mapProfileToUser(createSelfProviderConfig(), {
 			ctx,
 			profile: {
+				dn: 'uid=mark,ou=people,dc=example,dc=com',
 				uid: 'mark',
 				cn: 'Mark Lee',
 			},
@@ -143,44 +333,77 @@ describe('ldap internal helpers', () => {
 			},
 		})
 	})
-
-	it('maps LDAP authentication failures to the expected API error code', async () => {
-		mocks.authenticateResult.mockResolvedValue({
-			code: AUTH_RESULT_FAILURE_CREDENTIAL_INVALID,
-			user: null,
-		})
-
-		await expectApiError(authenticateLdapUserProfile(createProviderConfig(), {
-			ctx,
-			password: 'wrong-password',
-			username: 'mark',
-		}), {
-			status: 'UNAUTHORIZED',
-			body: {
-				code: LDAP_ERROR_CODES.CREDENTIAL_INVALID,
-				message: 'Invalid LDAP credentials',
-			},
-		})
-
-		expect(mocks.authenticateResult).toHaveBeenCalledWith(expect.objectContaining({
-			username: 'mark',
-			userPassword: 'wrong-password',
-		}))
-	})
-
-	async function expectApiError(
-		promise: Promise<unknown>,
-		expected: {
-			status: string
-			body: {
-				code: string
-				message: string
-			}
-		},
-	): Promise<void> {
-		const error = await promise.catch(cause => cause)
-
-		expect(error).toBeInstanceOf(APIError)
-		expect(error).toMatchObject(expected)
-	}
 })
+
+function createAdminProviderConfig(
+	overrides: Partial<LdapProviderConfig> = {},
+): LdapProviderConfig {
+	return {
+		providerId: 'corp',
+		ldap: {
+			connection: {
+				startTLS: true,
+				tlsOptions: {
+					rejectUnauthorized: false,
+				},
+				url: 'ldap://ldap.example.com',
+			},
+			admin: {
+				dn: 'cn=read-only-admin,dc=example,dc=com',
+				password: 'admin-password',
+			},
+			user: {
+				dn: ({ username }) => `uid=${username},ou=people,dc=example,dc=com`,
+				search: {
+					attributes: ['dn', 'mail', 'cn'],
+				},
+				group: {
+					search: {
+						baseDn: 'ou=groups,dc=example,dc=com',
+						filter: ({ userDn }) => `(member=${userDn})`,
+					},
+				},
+			},
+		},
+		...overrides,
+	}
+}
+
+function createSelfProviderConfig(
+	overrides: Partial<LdapProviderConfig> = {},
+): LdapProviderConfig {
+	return {
+		providerId: 'corp',
+		ldap: {
+			connection: {
+				tlsOptions: {
+					rejectUnauthorized: false,
+				},
+				url: 'ldaps://ldap.example.com',
+			},
+			user: {
+				dn: ({ username }) => `uid=${username},ou=people,dc=example,dc=com`,
+				search: {
+					attributes: ['dn', 'mail', 'cn'],
+				},
+			},
+		},
+		...overrides,
+	}
+}
+
+async function expectApiError(
+	promise: Promise<unknown>,
+	expected: {
+		status: string
+		body: {
+			code: string
+			message: string
+		}
+	},
+): Promise<void> {
+	const error = await promise.catch(cause => cause)
+
+	expect(error).toBeInstanceOf(APIError)
+	expect(error).toMatchObject(expected)
+}

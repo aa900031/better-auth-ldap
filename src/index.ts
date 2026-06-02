@@ -1,6 +1,6 @@
 import type { GenericEndpointContext } from '@better-auth/core'
 import type { BetterAuthPlugin } from 'better-auth'
-import type { AuthenticationOptions } from 'ldap-authentication'
+import type { ClientOptions, Entry, Filter, SearchOptions } from 'ldapts'
 import { APIError, createAuthEndpoint } from 'better-auth/api'
 import { setSessionCookie } from 'better-auth/cookies'
 import { handleOAuthUserInfo } from 'better-auth/oauth2'
@@ -14,8 +14,11 @@ type Awaitable<T> = T | Promise<T>
 
 export type LdapEndpointContext = GenericEndpointContext
 
+export interface LdapGroupProfile extends Entry {}
+
 export interface LdapUserProfile extends Record<string, unknown> {
-	dn?: string | undefined
+	dn: string
+	groups?: LdapGroupProfile[] | undefined
 }
 
 export interface LdapUserInfo extends Record<string, unknown> {
@@ -25,18 +28,78 @@ export interface LdapUserInfo extends Record<string, unknown> {
 	emailVerified?: boolean | undefined
 	image?: string | null | undefined
 }
-export interface LdapUserDnInput {
+
+export interface LdapRuntimeCredentials {
 	providerId: string
 	username: string
+	password: string
 	ctx: LdapEndpointContext
 }
 
-export type LdapAuthenticationConfig = Omit<
-	AuthenticationOptions,
-	'username' | 'userPassword' | 'userDn'
-> & {
-	userDn?: string | ((input: LdapUserDnInput) => Awaitable<string>) | undefined
+export interface LdapUserDnResolverInput extends Omit<LdapRuntimeCredentials, 'password'> {}
+
+export interface LdapUserSearchResolverInput extends LdapRuntimeCredentials {}
+
+export interface LdapGroupSearchResolverInput extends LdapRuntimeCredentials {
+	userDn: string
+	profile: LdapUserProfile
 }
+
+export type LdapBaseDnResolver<TInput> = string | ((input: TInput) => Awaitable<string>)
+
+export type LdapFilterResolver<TInput> = string | Filter | ((input: TInput) => Awaitable<string | Filter>)
+
+export interface LdapConnectionConfig extends ClientOptions {
+	startTLS?: boolean | undefined
+}
+
+export interface LdapAdminConfig {
+	dn: string | ((ctx: LdapEndpointContext) => Awaitable<string>)
+	password: string | ((ctx: LdapEndpointContext) => Awaitable<string>)
+}
+
+export interface LdapUserSearchConfig extends Omit<SearchOptions, 'filter'> {
+	baseDn?: LdapBaseDnResolver<LdapUserSearchResolverInput> | undefined
+	filter?: LdapFilterResolver<LdapUserSearchResolverInput> | undefined
+}
+
+export interface LdapGroupSearchConfig extends Omit<SearchOptions, 'filter'> {
+	baseDn: LdapBaseDnResolver<LdapGroupSearchResolverInput>
+	filter?: LdapFilterResolver<LdapGroupSearchResolverInput> | undefined
+}
+
+export interface LdapUserGroupConfig {
+	search: LdapGroupSearchConfig
+}
+
+export interface LdapUserConfigBase {
+	search: LdapUserSearchConfig
+	group?: LdapUserGroupConfig | undefined
+}
+
+export interface LdapAdminUserConfig extends LdapUserConfigBase {
+	dn?: string | ((input: LdapUserDnResolverInput) => Awaitable<string>) | undefined
+}
+
+export interface LdapSelfUserConfig extends LdapUserConfigBase {
+	dn: string | ((input: LdapUserDnResolverInput) => Awaitable<string>)
+}
+
+export interface LdapAuthConfigBase {
+	connection: LdapConnectionConfig
+}
+
+export interface LdapAdminAuthConfig extends LdapAuthConfigBase {
+	admin: LdapAdminConfig
+	user: LdapAdminUserConfig
+}
+
+export interface LdapSelfAuthConfig extends LdapAuthConfigBase {
+	admin?: never
+	user: LdapSelfUserConfig
+}
+
+export type LdapAuthConfig = LdapAdminAuthConfig | LdapSelfAuthConfig
 
 export interface LdapMapProfileInput {
 	providerId: string
@@ -47,7 +110,7 @@ export interface LdapMapProfileInput {
 
 export interface LdapProviderConfig {
 	providerId: string
-	ldap: LdapAuthenticationConfig
+	ldap: LdapAuthConfig
 	disableImplicitSignUp?: boolean | undefined
 	disableSignUp?: boolean | undefined
 	overrideUserInfo?: boolean | undefined

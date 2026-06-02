@@ -64,7 +64,7 @@
 	},
 	"dependencies": {
 		"@better-auth/core": "^1.6.11",
-		"ldap-authentication": "^4.0.4",
+		"ldapts": "^8.1.8",
 		"zod": "^4.4.3"
 	},
 	"devDependencies": {

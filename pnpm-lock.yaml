@@ -11,9 +11,9 @@ importers:
       '@better-auth/core':
         specifier: ^1.6.11
         version: 1.6.11(@better-auth/utils@0.4.0)(@better-fetch/fetch@1.1.21)(better-call@1.3.5(zod@4.4.3))(jose@6.2.3)(kysely@0.28.17)(nanostores@1.3.0)
-      ldap-authentication:
-        specifier: ^4.0.4
-        version: 4.0.4
+      ldapts:
+        specifier: ^8.1.8
+        version: 8.1.8
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -2061,10 +2061,6 @@ packages:
 
   kysely@0.28.17:
     resolution: {integrity: sha512-nbD8lB9EB3wNdMhOCdx5Li8DxnLbvKByylRLcJ1h+4SkrowVeECAyZlyiKMThF7xFdRz0jSQ2MoJr+wXux2y0Q==}
-    engines: {node: '>=20.0.0'}
-
-  ldap-authentication@4.0.4:
-    resolution: {integrity: sha512-dcI/CAfbgJ+Nmr3MDPMGMBSQscqBJ/JyNC+JNuhtfLmcMen7voP82DYBERv2+LEs+W9+nCGU7AkgkydFUS1ugg==}
     engines: {node: '>=20.0.0'}
 
   ldapts@8.1.8:
@@ -5035,10 +5031,6 @@ snapshots:
       json-buffer: 3.0.1
 
   kysely@0.28.17: {}
-
-  ldap-authentication@4.0.4:
-    dependencies:
-      ldapts: 8.1.8
 
   ldapts@8.1.8:
     dependencies:

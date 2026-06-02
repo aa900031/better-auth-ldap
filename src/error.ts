@@ -10,5 +10,3 @@ export const LDAP_ERROR_CODES = {
 	USER_NAME_MISSING: 'LDAP_USER_NAME_MISSING',
 	LINK_ERROR: 'LDAP_LINK_ERROR',
 } as const
-
-export type LdapErrorCode = (typeof LDAP_ERROR_CODES)[keyof typeof LDAP_ERROR_CODES]
