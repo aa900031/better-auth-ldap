@@ -271,10 +271,10 @@ async function resolveOptionalUserDn(
 
 	return typeof userDn === 'function'
 		? await userDn({
-			ctx: input.ctx,
-			providerId: providerConfig.providerId,
-			username: input.username,
-		})
+				ctx: input.ctx,
+				providerId: providerConfig.providerId,
+				username: input.username,
+			})
 		: userDn
 }
 
@@ -287,10 +287,10 @@ async function resolveRequiredUserDn(
 ): Promise<string> {
 	const userDn = typeof providerConfig.ldap.user.dn === 'function'
 		? await providerConfig.ldap.user.dn({
-			ctx: input.ctx,
-			providerId: providerConfig.providerId,
-			username: input.username,
-		})
+				ctx: input.ctx,
+				providerId: providerConfig.providerId,
+				username: input.username,
+			})
 		: providerConfig.ldap.user.dn
 
 	if (!userDn) {

@@ -235,8 +235,8 @@ ldap({
 If you want structured filters instead of strings, pass any `ldapts` `Filter` instance from a resolver.
 
 ```ts
-import { EqualityFilter } from 'ldapts'
 import { ldap } from 'better-auth-ldap'
+import { EqualityFilter } from 'ldapts'
 
 ldap({
 	config: [
