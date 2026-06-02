@@ -2,7 +2,7 @@ import type { LdapEndpointContext, LdapProviderConfig } from './index'
 import { APIError } from 'better-auth/api'
 import { InvalidCredentialsError } from 'ldapts'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { LDAP_ERROR_CODES } from './error'
+import { LDAP_ERROR_CODES } from './error-codes'
 import {
 	authenticateLdapUserProfile,
 	getDefaultUserInfo,
@@ -371,7 +371,7 @@ describe('ldap internal helpers', () => {
 		}), {
 			status: 'UNAUTHORIZED',
 			body: {
-				code: LDAP_ERROR_CODES.CREDENTIAL_INVALID,
+				code: LDAP_ERROR_CODES.LDAP_CREDENTIAL_INVALID.code,
 				message: 'Invalid LDAP credentials',
 			},
 		})
@@ -400,7 +400,7 @@ describe('ldap internal helpers', () => {
 		}), {
 			status: 'UNAUTHORIZED',
 			body: {
-				code: LDAP_ERROR_CODES.IDENTITY_AMBIGUOUS,
+				code: LDAP_ERROR_CODES.LDAP_IDENTITY_AMBIGUOUS.code,
 				message: 'Invalid LDAP credentials',
 			},
 		})
@@ -431,7 +431,7 @@ describe('ldap internal helpers', () => {
 		}), {
 			status: 'BAD_REQUEST',
 			body: {
-				code: LDAP_ERROR_CODES.AUTHENTICATION_FAILED,
+				code: LDAP_ERROR_CODES.LDAP_AUTHENTICATION_FAILED.code,
 				message: 'LDAP user.search.baseDn or user.dn is required',
 			},
 		})
@@ -501,8 +501,28 @@ describe('ldap internal helpers', () => {
 		}), {
 			status: 'UNAUTHORIZED',
 			body: {
-				code: LDAP_ERROR_CODES.USER_EMAIL_MISSING,
+				code: LDAP_ERROR_CODES.LDAP_USER_EMAIL_MISSING.code,
 				message: 'LDAP user email is missing',
+			},
+		})
+	})
+
+	it('rejects missing mapped user info', async () => {
+		await expectApiError(mapProfileToUser(createSelfProviderConfig({
+			mapProfileToUser: async () => undefined as unknown as never,
+		}), {
+			ctx,
+			profile: {
+				dn: 'uid=mark,ou=people,dc=example,dc=com',
+				uid: 'mark',
+			},
+			providerId: 'corp',
+			username: 'mark',
+		}), {
+			status: 'UNAUTHORIZED',
+			body: {
+				code: LDAP_ERROR_CODES.LDAP_USER_INFO_MISSING.code,
+				message: 'LDAP user info is missing',
 			},
 		})
 	})

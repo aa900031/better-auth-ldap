@@ -18,7 +18,7 @@ import type {
 import { Buffer } from 'node:buffer'
 import { APIError } from 'better-auth/api'
 import { Client, InvalidCredentialsError, NoSuchObjectError } from 'ldapts'
-import { LDAP_ERROR_CODES } from './error'
+import { LDAP_ERROR_CODES } from './error-codes'
 
 class LdapConfigError extends Error {}
 
@@ -108,22 +108,19 @@ export async function authenticateLdapUserProfile(
 		}
 
 		if (error instanceof LdapConfigError) {
-			throw new APIError('BAD_REQUEST', {
-				code: LDAP_ERROR_CODES.AUTHENTICATION_FAILED,
+			throw APIError.from('BAD_REQUEST', {
+				...LDAP_ERROR_CODES.LDAP_AUTHENTICATION_FAILED,
 				message: getErrorMessage(error, 'Invalid LDAP authentication options'),
 			})
 		}
 
 		if (error instanceof InvalidCredentialsError) {
-			throw new APIError('UNAUTHORIZED', {
-				code: LDAP_ERROR_CODES.CREDENTIAL_INVALID,
-				message: 'Invalid LDAP credentials',
-			})
+			throw APIError.from('UNAUTHORIZED', LDAP_ERROR_CODES.LDAP_CREDENTIAL_INVALID)
 		}
 
-		throw new APIError('UNAUTHORIZED', {
-			code: LDAP_ERROR_CODES.AUTHENTICATION_FAILED,
-			message: getErrorMessage(error, 'LDAP authentication failed'),
+		throw APIError.from('UNAUTHORIZED', {
+			...LDAP_ERROR_CODES.LDAP_AUTHENTICATION_FAILED,
+			message: getErrorMessage(error, LDAP_ERROR_CODES.LDAP_AUTHENTICATION_FAILED.message),
 		})
 	}
 	finally {
@@ -140,25 +137,20 @@ export async function mapProfileToUser(
 		? await providerConfig.mapProfileToUser(input)
 		: getDefaultUserInfo(input.profile, input.username)
 
+	if (!userInfo) {
+		throw APIError.from('UNAUTHORIZED', LDAP_ERROR_CODES.LDAP_USER_INFO_MISSING)
+	}
+
 	if (!userInfo.id) {
-		throw new APIError('UNAUTHORIZED', {
-			code: LDAP_ERROR_CODES.USER_ID_MISSING,
-			message: 'LDAP user id is missing',
-		})
+		throw APIError.from('UNAUTHORIZED', LDAP_ERROR_CODES.LDAP_USER_ID_MISSING)
 	}
 
 	if (!userInfo.email) {
-		throw new APIError('UNAUTHORIZED', {
-			code: LDAP_ERROR_CODES.USER_EMAIL_MISSING,
-			message: 'LDAP user email is missing',
-		})
+		throw APIError.from('UNAUTHORIZED', LDAP_ERROR_CODES.LDAP_USER_EMAIL_MISSING)
 	}
 
 	if (!userInfo.name) {
-		throw new APIError('UNAUTHORIZED', {
-			code: LDAP_ERROR_CODES.USER_NAME_MISSING,
-			message: 'LDAP user name is missing',
-		})
+		throw APIError.from('UNAUTHORIZED', LDAP_ERROR_CODES.LDAP_USER_NAME_MISSING)
 	}
 
 	return {
@@ -343,27 +335,18 @@ async function searchForSingleUserProfile(
 	}
 	catch (error) {
 		if (error instanceof NoSuchObjectError) {
-			throw new APIError('UNAUTHORIZED', {
-				code: LDAP_ERROR_CODES.IDENTITY_NOT_FOUND,
-				message: 'Invalid LDAP credentials',
-			})
+			throw APIError.from('UNAUTHORIZED', LDAP_ERROR_CODES.LDAP_IDENTITY_NOT_FOUND)
 		}
 
 		throw error
 	}
 
 	if (!searchEntries.length || !searchEntries[0]?.dn) {
-		throw new APIError('UNAUTHORIZED', {
-			code: LDAP_ERROR_CODES.IDENTITY_NOT_FOUND,
-			message: 'Invalid LDAP credentials',
-		})
+		throw APIError.from('UNAUTHORIZED', LDAP_ERROR_CODES.LDAP_IDENTITY_NOT_FOUND)
 	}
 
 	if (searchEntries.length > 1) {
-		throw new APIError('UNAUTHORIZED', {
-			code: LDAP_ERROR_CODES.IDENTITY_AMBIGUOUS,
-			message: 'Invalid LDAP credentials',
-		})
+		throw APIError.from('UNAUTHORIZED', LDAP_ERROR_CODES.LDAP_IDENTITY_AMBIGUOUS)
 	}
 
 	return toUserProfile(searchEntries[0])

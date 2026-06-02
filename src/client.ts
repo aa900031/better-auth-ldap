@@ -1,24 +1,22 @@
 import type { BetterAuthClientPlugin } from 'better-auth/client'
-import type { LdapPlugin } from './index'
+import type { ldap } from './index'
 import pkg from '../package.json' with { type: 'json' }
+import { LDAP_ERROR_CODES } from './error-codes'
 
-export { LDAP_ERROR_CODES } from './error'
+export { LDAP_ERROR_CODES } from './error-codes'
 
-export interface LdapClientPlugin extends BetterAuthClientPlugin {
-	id: 'ldap'
-	$InferServerPlugin: LdapPlugin
-}
-
-export function ldapClient(): LdapClientPlugin {
+// eslint-disable-next-line ts/explicit-function-return-type
+export function ldapClient() {
 	return {
 		id: 'ldap',
 		version: pkg.version,
+		$InferServerPlugin: {} as ReturnType<typeof ldap>,
 		atomListeners: [
 			{
 				signal: '$sessionSignal',
 				matcher: path => path === '/sign-in/ldap',
 			},
 		],
-		$InferServerPlugin: {} as LdapPlugin,
-	} satisfies LdapClientPlugin
+		$ERROR_CODES: LDAP_ERROR_CODES,
+	} satisfies BetterAuthClientPlugin
 }

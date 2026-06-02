@@ -6,10 +6,10 @@ import { setSessionCookie } from 'better-auth/cookies'
 import { handleOAuthUserInfo } from 'better-auth/oauth2'
 import * as z from 'zod'
 import pkg from '../package.json' with { type: 'json' }
-import { LDAP_ERROR_CODES } from './error'
+import { LDAP_ERROR_CODES } from './error-codes'
 import { authenticateLdapUserProfile, mapProfileToUser } from './internal'
 
-export { LDAP_ERROR_CODES } from './error'
+export { LDAP_ERROR_CODES } from './error-codes'
 
 type Awaitable<T> = T | Promise<T>
 
@@ -126,14 +126,6 @@ export interface LdapOptions {
 	config: LdapProviderConfig[]
 }
 
-export interface LdapPlugin extends BetterAuthPlugin {
-	id: 'ldap'
-	endpoints: {
-		signInWithLdap: ReturnType<typeof signInWithLdap>
-	}
-	options: LdapOptions
-}
-
 const signInWithLdapBodySchema = z.object({
 	providerId: z.string().min(1).meta({
 		description: 'The provider ID for the LDAP provider',
@@ -149,17 +141,19 @@ const signInWithLdapBodySchema = z.object({
 	}),
 })
 
+// eslint-disable-next-line ts/explicit-function-return-type
 export function ldap(
 	options: LdapOptions,
-): LdapPlugin {
+) {
 	return {
 		id: 'ldap',
 		version: pkg.version,
+		$ERROR_CODES: LDAP_ERROR_CODES,
 		endpoints: {
 			signInWithLdap: signInWithLdap(options),
 		},
 		options,
-	} satisfies LdapPlugin
+	} satisfies BetterAuthPlugin
 }
 
 // eslint-disable-next-line ts/explicit-function-return-type
@@ -204,8 +198,8 @@ function signInWithLdap(
 			)
 
 			if (!providerConfig) {
-				throw new APIError('BAD_REQUEST', {
-					code: LDAP_ERROR_CODES.PROVIDER_CONFIG_NOT_FOUND,
+				throw APIError.from('BAD_REQUEST', {
+					...LDAP_ERROR_CODES.LDAP_PROVIDER_CONFIG_NOT_FOUND,
 					message: `LDAP provider config not found: ${ctx.body.providerId}`,
 				})
 			}
@@ -242,8 +236,8 @@ function signInWithLdap(
 			})
 
 			if (result.error) {
-				throw new APIError('UNAUTHORIZED', {
-					code: LDAP_ERROR_CODES.LINK_ERROR,
+				throw APIError.from('UNAUTHORIZED', {
+					...LDAP_ERROR_CODES.LDAP_LINK_ERROR,
 					message: result.error,
 				})
 			}
