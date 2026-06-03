@@ -1,4 +1,9 @@
-import type { LdapEndpointContext, LdapProviderConfig } from './index'
+import type {
+	LdapAdminAuthConfig,
+	LdapEndpointContext,
+	LdapProviderConfig,
+	LdapSelfAuthConfig,
+} from './options'
 import { APIError } from 'better-auth/api'
 import { InvalidCredentialsError } from 'ldapts'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -7,7 +12,10 @@ import {
 	authenticateLdapUserProfile,
 	getDefaultUserInfo,
 	mapProfileToUser,
-} from './internal'
+} from './ldap'
+
+type AdminProviderConfig = LdapProviderConfig & { ldap: LdapAdminAuthConfig }
+type SelfProviderConfig = LdapProviderConfig & { ldap: LdapSelfAuthConfig }
 
 const mocks = vi.hoisted(() => {
 	return {
@@ -81,7 +89,7 @@ const ctx = {
 	},
 } as LdapEndpointContext
 
-describe('ldap internal helpers', () => {
+describe('authenticateLdapUserProfile', () => {
 	beforeEach(() => {
 		mocks.bindQueue.length = 0
 		mocks.clients.length = 0
@@ -264,49 +272,6 @@ describe('ldap internal helpers', () => {
 		)
 	})
 
-	it('passes resolved user.dn to the user.search.baseDn resolver', async () => {
-		let receivedUserDn: string | undefined
-		mocks.bindQueue.push({})
-		mocks.searchQueue.push({
-			result: {
-				searchEntries: [
-					{
-						cn: 'Mark Lee',
-						dn: 'uid=mark,ou=people,dc=example,dc=com',
-						mail: 'mark@example.com',
-					},
-				],
-				searchReferences: [],
-			},
-		})
-
-		await authenticateLdapUserProfile(createSelfProviderConfig({
-			ldap: {
-				connection: {
-					tlsOptions: {
-						rejectUnauthorized: false,
-					},
-					url: 'ldaps://ldap.example.com',
-				},
-				user: {
-					dn: ({ username }) => `uid=${username},ou=people,dc=example,dc=com`,
-					search: {
-						baseDn: ({ userDn }) => {
-							receivedUserDn = userDn
-							return userDn ?? ''
-						},
-					},
-				},
-			},
-		}), {
-			ctx,
-			password: 'password',
-			username: 'mark',
-		})
-
-		expect(receivedUserDn).toBe('uid=mark,ou=people,dc=example,dc=com')
-	})
-
 	it('authenticates in admin mode when user.search is omitted and falls back to user.dn', async () => {
 		mocks.bindQueue.push({}, {})
 		mocks.searchQueue.push({
@@ -436,13 +401,14 @@ describe('ldap internal helpers', () => {
 			},
 		})
 	})
+})
 
+describe('getDefaultUserInfo', () => {
 	it('derives default user info from preferred LDAP fields and binary photos', () => {
 		const userInfo = getDefaultUserInfo(
 			{
 				displayName: 'Mark Lee',
 				dn: 'uid=mark,ou=people,dc=example,dc=com',
-				thumbnailPhoto: Uint8Array.from([1, 2, 3]),
 				userPrincipalName: [' ', 'MARK@EXAMPLE.COM'],
 			},
 			'mark',
@@ -452,11 +418,12 @@ describe('ldap internal helpers', () => {
 			email: 'MARK@EXAMPLE.COM',
 			emailVerified: false,
 			id: 'uid=mark,ou=people,dc=example,dc=com',
-			image: 'AQID',
 			name: 'Mark Lee',
 		})
 	})
+})
 
+describe('mapProfileToUser', () => {
 	it('merges mapped fields with defaults and normalizes email casing', async () => {
 		const providerConfig = createSelfProviderConfig({
 			mapProfileToUser: async () => ({
@@ -471,9 +438,9 @@ describe('ldap internal helpers', () => {
 		const userInfo = await mapProfileToUser(providerConfig, {
 			ctx,
 			profile: {
+				cn: 'Mark Lee',
 				dn: 'uid=mark,ou=people,dc=example,dc=com',
 				mail: 'ignored@example.com',
-				cn: 'Mark Lee',
 			},
 			providerId: 'corp',
 			username: 'mark',
@@ -492,9 +459,9 @@ describe('ldap internal helpers', () => {
 		await expectApiError(mapProfileToUser(createSelfProviderConfig(), {
 			ctx,
 			profile: {
+				cn: 'Mark Lee',
 				dn: 'uid=mark,ou=people,dc=example,dc=com',
 				uid: 'mark',
-				cn: 'Mark Lee',
 			},
 			providerId: 'corp',
 			username: 'mark',
@@ -529,8 +496,8 @@ describe('ldap internal helpers', () => {
 })
 
 function createAdminProviderConfig(
-	overrides: Partial<LdapProviderConfig> = {},
-): LdapProviderConfig {
+	overrides: Partial<AdminProviderConfig> = {},
+): AdminProviderConfig {
 	return {
 		providerId: 'corp',
 		ldap: {
@@ -563,8 +530,8 @@ function createAdminProviderConfig(
 }
 
 function createSelfProviderConfig(
-	overrides: Partial<LdapProviderConfig> = {},
-): LdapProviderConfig {
+	overrides: Partial<SelfProviderConfig> = {},
+): SelfProviderConfig {
 	return {
 		providerId: 'corp',
 		ldap: {

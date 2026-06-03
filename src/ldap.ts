@@ -1,26 +1,38 @@
-import type { ClientOptions, SearchOptions } from 'ldapts'
+import type { Entry } from 'ldapts'
 import type {
-	LdapAdminAuthConfig,
 	LdapConnectionConfig,
 	LdapEndpointContext,
-	LdapFilterResolver,
 	LdapGroupProfile,
 	LdapGroupSearchConfig,
 	LdapGroupSearchResolverInput,
 	LdapMapProfileInput,
 	LdapProviderConfig,
-	LdapSelfAuthConfig,
 	LdapUserInfo,
-	LdapUserProfile,
 	LdapUserSearchConfig,
 	LdapUserSearchResolverInput,
-} from './index'
+} from './options'
 import { Buffer } from 'node:buffer'
 import { APIError } from 'better-auth/api'
 import { Client, InvalidCredentialsError, NoSuchObjectError } from 'ldapts'
 import { LDAP_ERROR_CODES } from './error-codes'
+import {
+	createUserSearchResolverInput,
+	isAdminAuthConfig,
+	isSelfAuthConfig,
+	LdapConfigError,
+	resolveAdminDn,
+	resolveAdminPassword,
+	resolveBaseDN,
+	resolveClientOptions,
+	resolveOptionalUserDn,
+	resolveRequiredUserDn,
+	resolveSearchOptions,
+	resolveUserSearchBaseDN,
+} from './options'
 
-class LdapConfigError extends Error {}
+export type LdapUserProfile = Entry & {
+	groups?: LdapGroupProfile[] | undefined
+}
 
 export async function authenticateLdapUserProfile(
 	providerConfig: LdapProviderConfig,
@@ -199,15 +211,6 @@ export function getDefaultUserInfo(
 	}
 }
 
-function getFirstString(profile: LdapUserProfile, fieldNames: string[]): string | undefined {
-	for (const fieldName of fieldNames) {
-		const value = normalizeString(profile[fieldName])
-		if (value) {
-			return value
-		}
-	}
-}
-
 export function normalizeString(value: unknown): string | undefined {
 	if (typeof value === 'string') {
 		return value.trim() || undefined
@@ -231,67 +234,6 @@ export function normalizeString(value: unknown): string | undefined {
 	}
 }
 
-async function resolveAdminDn(
-	providerConfig: LdapProviderConfig & { ldap: LdapAdminAuthConfig },
-	ctx: LdapEndpointContext,
-): Promise<string> {
-	return typeof providerConfig.ldap.admin.dn === 'function'
-		? await providerConfig.ldap.admin.dn(ctx)
-		: providerConfig.ldap.admin.dn
-}
-
-async function resolveAdminPassword(
-	providerConfig: LdapProviderConfig & { ldap: LdapAdminAuthConfig },
-	ctx: LdapEndpointContext,
-): Promise<string> {
-	return typeof providerConfig.ldap.admin.password === 'function'
-		? await providerConfig.ldap.admin.password(ctx)
-		: providerConfig.ldap.admin.password
-}
-
-async function resolveOptionalUserDn(
-	providerConfig: LdapProviderConfig & { ldap: LdapAdminAuthConfig },
-	input: {
-		ctx: LdapEndpointContext
-		username: string
-	},
-): Promise<string | undefined> {
-	const userDn = providerConfig.ldap.user.dn
-	if (!userDn) {
-		return
-	}
-
-	return typeof userDn === 'function'
-		? await userDn({
-				ctx: input.ctx,
-				providerId: providerConfig.providerId,
-				username: input.username,
-			})
-		: userDn
-}
-
-async function resolveRequiredUserDn(
-	providerConfig: LdapProviderConfig & { ldap: LdapSelfAuthConfig },
-	input: {
-		ctx: LdapEndpointContext
-		username: string
-	},
-): Promise<string> {
-	const userDn = typeof providerConfig.ldap.user.dn === 'function'
-		? await providerConfig.ldap.user.dn({
-				ctx: input.ctx,
-				providerId: providerConfig.providerId,
-				username: input.username,
-			})
-		: providerConfig.ldap.user.dn
-
-	if (!userDn) {
-		throw new LdapConfigError('LDAP user.dn is required')
-	}
-
-	return userDn
-}
-
 async function createBoundClient(
 	connection: LdapConnectionConfig,
 	dn: string,
@@ -306,7 +248,7 @@ async function createBoundClient(
 	}
 
 	try {
-		if (connection.startTLS && !isLdaps(connection.url)) {
+		if (connection.startTLS && !connection.url.startsWith('ldaps://')) {
 			await client.startTLS(connection.tlsOptions)
 		}
 
@@ -349,7 +291,7 @@ async function searchForSingleUserProfile(
 		throw APIError.from('UNAUTHORIZED', LDAP_ERROR_CODES.LDAP_IDENTITY_AMBIGUOUS)
 	}
 
-	return toUserProfile(searchEntries[0])
+	return searchEntries[0]
 }
 
 async function searchForGroupProfiles(
@@ -364,129 +306,21 @@ async function searchForGroupProfiles(
 	return searchEntries.map(group => ({ ...group }))
 }
 
-async function resolveUserSearchBaseDN(
-	searchConfig: LdapUserSearchConfig,
-	input: LdapUserSearchResolverInput,
-	fallbackBaseDN?: string,
-): Promise<string> {
-	if (searchConfig.baseDn !== undefined) {
-		return resolveBaseDN(searchConfig.baseDn, input)
-	}
-
-	if (fallbackBaseDN) {
-		return fallbackBaseDN
-	}
-
-	throw new LdapConfigError('LDAP user.search.baseDn or user.dn is required')
-}
-
-async function resolveBaseDN<TInput>(
-	baseDn: string | ((input: TInput) => Promise<string> | string),
-	input: TInput,
-): Promise<string> {
-	return typeof baseDn === 'function'
-		? await baseDn(input)
-		: baseDn
-}
-
-async function resolveSearchOptions<TInput>(
-	searchConfig: Omit<SearchOptions, 'filter'> & {
-		baseDn?: unknown
-		filter?: LdapFilterResolver<TInput> | undefined
-	},
-	input: TInput,
-	defaultScope: NonNullable<SearchOptions['scope']>,
-): Promise<SearchOptions> {
-	const {
-		baseDn: _baseDN,
-		filter,
-		scope,
-		...searchOptions
-	} = searchConfig
-
-	const resolvedFilter = await resolveFilter(filter, input)
-
-	return {
-		...searchOptions,
-		...(resolvedFilter ? { filter: resolvedFilter } : {}),
-		scope: scope ?? defaultScope,
-	}
-}
-
-async function resolveFilter<TInput>(
-	filter: LdapFilterResolver<TInput> | undefined,
-	input: TInput,
-): Promise<SearchOptions['filter'] | undefined> {
-	if (typeof filter === 'function') {
-		return filter(input)
-	}
-
-	return filter
-}
-
-function createUserSearchResolverInput(
-	providerConfig: LdapProviderConfig,
-	input: {
-		ctx: LdapEndpointContext
-		password: string
-		username: string
-	},
-	userDn?: string,
-): LdapUserSearchResolverInput {
-	return {
-		ctx: input.ctx,
-		password: input.password,
-		providerId: providerConfig.providerId,
-		username: input.username,
-		userDn,
-	}
-}
-
-function toUserProfile(
-	profile: Record<string, unknown> & { dn: string },
-): LdapUserProfile {
-	return {
-		...profile,
-		dn: profile.dn,
-	}
-}
-
-function resolveClientOptions(connection: LdapConnectionConfig): ClientOptions {
-	const {
-		startTLS: _startTLS,
-		...clientOptions
-	} = connection
-
-	if (isLdaps(connection.url)) {
-		return clientOptions
-	}
-
-	const { tlsOptions: _tlsOptions, ...plainOptions } = clientOptions
-	return plainOptions
-}
-
-function isLdaps(url: string): boolean {
-	return url.startsWith('ldaps://')
-}
-
-function isAdminAuthConfig(
-	providerConfig: LdapProviderConfig,
-): providerConfig is LdapProviderConfig & { ldap: LdapAdminAuthConfig } {
-	return providerConfig.ldap.admin !== undefined
-}
-
-function isSelfAuthConfig(
-	providerConfig: LdapProviderConfig,
-): providerConfig is LdapProviderConfig & { ldap: LdapSelfAuthConfig } {
-	return providerConfig.ldap.admin === undefined
-}
-
 async function safeUnbind(client: Client | undefined): Promise<void> {
 	if (!client?.isConnected) {
 		return
 	}
 
 	await client.unbind().catch(() => undefined)
+}
+
+function getFirstString(profile: LdapUserProfile, fieldNames: string[]): string | undefined {
+	for (const fieldName of fieldNames) {
+		const value = normalizeString(profile[fieldName])
+		if (value) {
+			return value
+		}
+	}
 }
 
 function getErrorMessage(
