@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      ldap-escape:
+        specifier: ^2.0.6
+        version: 2.0.6
       ldapts:
         specifier: ^8.1.8
         version: 8.1.8
@@ -27,6 +30,9 @@ importers:
       '@tsconfig/node24':
         specifier: ^24.0.4
         version: 24.0.4
+      '@types/ldap-escape':
+        specifier: ^2.0.2
+        version: 2.0.2
       '@types/node':
         specifier: ^24.1.0
         version: 24.12.4
@@ -929,6 +935,9 @@ packages:
 
   '@types/json-schema@7.0.15':
     resolution: {integrity: sha512-5+fP8P8MFNC+AyZCDxrB2pkZFPGzqQWUzpSeuuVLvm8VMcorNYavBqoFcxK8bQz4Qsbn4oUEEem4wDLfcysGHA==}
+
+  '@types/ldap-escape@2.0.2':
+    resolution: {integrity: sha512-ffggxnzBNYwI+SUDWGJ+8n1Dfewtkb0fi4LaD7ujrlkZuWIBuF2EHlEfXSQMbghTdKW8TYYwrauE0SjkLCS0gQ==}
 
   '@types/mdast@4.0.4':
     resolution: {integrity: sha512-kGaNbPh1k7AFzgpud/gMdvIm5xuECykRR+JnWKQno9TAXVa6WIVCGTPvYGekIDL4uwCZQSYbUxNBSb1aUo79oA==}
@@ -2054,6 +2063,9 @@ packages:
   kysely@0.28.17:
     resolution: {integrity: sha512-nbD8lB9EB3wNdMhOCdx5Li8DxnLbvKByylRLcJ1h+4SkrowVeECAyZlyiKMThF7xFdRz0jSQ2MoJr+wXux2y0Q==}
     engines: {node: '>=20.0.0'}
+
+  ldap-escape@2.0.6:
+    resolution: {integrity: sha512-M0mZojh0QIDSDkA0+M5Zopqz3Ku5DNs1/Q8VqWO5l3Pjx1J2p71c9WksQIDQQKmd1XkV3N2NZFwcBFLJSm1l1w==}
 
   ldapts@8.1.8:
     resolution: {integrity: sha512-Wpdvo+/0DREIynYf2he2efHtjptr5zD7dpesSkZWJqfQdMEgSTytEIsSZVuoDSiiE1+SpXf3emZ7ewxGBTo7Pw==}
@@ -3898,6 +3910,8 @@ snapshots:
 
   '@types/json-schema@7.0.15': {}
 
+  '@types/ldap-escape@2.0.2': {}
+
   '@types/mdast@4.0.4':
     dependencies:
       '@types/unist': 3.0.3
@@ -5021,6 +5035,8 @@ snapshots:
       json-buffer: 3.0.1
 
   kysely@0.28.17: {}
+
+  ldap-escape@2.0.6: {}
 
   ldapts@8.1.8:
     dependencies:

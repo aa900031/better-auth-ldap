@@ -6,6 +6,7 @@ import { handleOAuthUserInfo } from 'better-auth/oauth2'
 import * as z from 'zod'
 import { LDAP_ERROR_CODES } from '../error-codes'
 import { authenticateLdapUserProfile, mapProfileToUser } from '../ldap'
+import { escapeRdnValue } from '../utils/escape'
 
 // eslint-disable-next-line ts/explicit-function-return-type
 export function signInWithLdap(
@@ -70,17 +71,20 @@ export function signInWithLdap(
 				})
 			}
 
+			const username = escapeRdnValue(ctx.body.username)
+			const password = ctx.body.password
+
 			const profile = await authenticateLdapUserProfile(providerConfig, {
 				ctx,
-				password: ctx.body.password,
-				username: ctx.body.username,
+				username,
+				password,
 			})
 
 			const userInfo = await mapProfileToUser(providerConfig, {
 				ctx,
 				profile,
+				username,
 				providerId: providerConfig.providerId,
-				username: ctx.body.username,
 			})
 
 			const result = await handleOAuthUserInfo(ctx, {
