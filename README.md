@@ -195,7 +195,7 @@ By default, LDAP profiles are mapped with these fields:
 - `image`: `jpegPhoto`, `thumbnailPhoto`, `jpegPhoto;binary`, then `thumbnailPhoto;binary`
 - `emailVerified`: `false`
 
-Override or extend the mapping per provider with `mapProfileToUser`.
+Override or extend the mapping per provider with `mapProfileToUser`. The callback returns partial user fields, which are merged over the default LDAP mapping.
 
 ```ts
 ldap({

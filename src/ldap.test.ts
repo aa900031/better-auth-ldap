@@ -424,7 +424,35 @@ describe('getDefaultUserInfo', () => {
 })
 
 describe('mapProfileToUser', () => {
-	it('merges mapped fields with defaults and normalizes email casing', async () => {
+	it('merges partial mapped fields with default user info', async () => {
+		const providerConfig = createSelfProviderConfig({
+			mapProfileToUser: async () => ({
+				emailVerified: true,
+				image: 'https://example.com/avatar.png',
+			}),
+		})
+
+		const userInfo = await mapProfileToUser(providerConfig, {
+			ctx,
+			profile: {
+				cn: 'Mark Lee',
+				dn: 'uid=mark,ou=people,dc=example,dc=com',
+				mail: 'MARK@EXAMPLE.COM',
+			},
+			providerId: 'corp',
+			username: 'mark',
+		})
+
+		expect(userInfo).toEqual({
+			email: 'MARK@EXAMPLE.COM',
+			emailVerified: true,
+			id: 'uid=mark,ou=people,dc=example,dc=com',
+			image: 'https://example.com/avatar.png',
+			name: 'Mark Lee',
+		})
+	})
+
+	it('merges mapped fields with defaults and preserves overridden email casing', async () => {
 		const providerConfig = createSelfProviderConfig({
 			mapProfileToUser: async () => ({
 				name: 'Mark Lee',
@@ -448,10 +476,37 @@ describe('mapProfileToUser', () => {
 
 		expect(userInfo).toEqual({
 			id: 'directory-guid',
-			email: 'override@example.com',
+			email: 'Override@Example.Com',
 			name: 'Mark Lee',
 			emailVerified: true,
 			image: 'https://example.com/avatar.png',
+		})
+	})
+
+	it('treats blank mapped values as invalid overrides', async () => {
+		const providerConfig = createSelfProviderConfig({
+			mapProfileToUser: async () => ({
+				email: ' ',
+				id: '',
+				name: '   ',
+			}),
+		})
+
+		await expectApiError(mapProfileToUser(providerConfig, {
+			ctx,
+			profile: {
+				cn: 'Mark Lee',
+				dn: 'uid=mark,ou=people,dc=example,dc=com',
+				mail: 'mark@example.com',
+			},
+			providerId: 'corp',
+			username: 'mark',
+		}), {
+			status: 'UNAUTHORIZED',
+			body: {
+				code: LDAP_ERROR_CODES.LDAP_USER_ID_MISSING.code,
+				message: 'LDAP user id is missing',
+			},
 		})
 	})
 
@@ -470,26 +525,6 @@ describe('mapProfileToUser', () => {
 			body: {
 				code: LDAP_ERROR_CODES.LDAP_USER_EMAIL_MISSING.code,
 				message: 'LDAP user email is missing',
-			},
-		})
-	})
-
-	it('rejects missing mapped user info', async () => {
-		await expectApiError(mapProfileToUser(createSelfProviderConfig({
-			mapProfileToUser: async () => undefined as unknown as never,
-		}), {
-			ctx,
-			profile: {
-				dn: 'uid=mark,ou=people,dc=example,dc=com',
-				uid: 'mark',
-			},
-			providerId: 'corp',
-			username: 'mark',
-		}), {
-			status: 'UNAUTHORIZED',
-			body: {
-				code: LDAP_ERROR_CODES.LDAP_USER_INFO_MISSING.code,
-				message: 'LDAP user info is missing',
 			},
 		})
 	})

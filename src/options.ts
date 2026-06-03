@@ -104,7 +104,7 @@ export interface LdapProviderConfig {
 	disableSignUp?: boolean | undefined
 	overrideUserInfo?: boolean | undefined
 	mapProfileToUser?:
-		| ((input: LdapMapProfileInput) => Awaitable<LdapUserInfo>)
+		| ((input: LdapMapProfileInput) => Awaitable<Partial<LdapUserInfo> | undefined>)
 		| undefined
 }
 

@@ -145,12 +145,13 @@ export async function mapProfileToUser(
 	providerConfig: LdapProviderConfig,
 	input: LdapMapProfileInput,
 ): Promise<LdapUserInfo> {
-	const userInfo = (typeof providerConfig.mapProfileToUser) === 'function'
+	const defaultUserInfo = getDefaultUserInfo(input.profile, input.username)
+	const mappedUserInfo = typeof providerConfig.mapProfileToUser === 'function'
 		? await providerConfig.mapProfileToUser(input)
-		: getDefaultUserInfo(input.profile, input.username)
-
-	if (!userInfo) {
-		throw APIError.from('UNAUTHORIZED', LDAP_ERROR_CODES.LDAP_USER_INFO_MISSING)
+		: undefined
+	const userInfo = {
+		...defaultUserInfo,
+		...mappedUserInfo,
 	}
 
 	if (!userInfo.id) {
@@ -167,7 +168,6 @@ export async function mapProfileToUser(
 
 	return {
 		...userInfo,
-		email: userInfo.email.toLowerCase(),
 		emailVerified: userInfo.emailVerified ?? false,
 	}
 }
@@ -211,7 +211,7 @@ export function getDefaultUserInfo(
 	}
 }
 
-export function normalizeString(value: unknown): string | undefined {
+function normalizeString(value: unknown): string | undefined {
 	if (typeof value === 'string') {
 		return value.trim() || undefined
 	}
