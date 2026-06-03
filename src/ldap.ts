@@ -38,8 +38,8 @@ export async function authenticateLdapUserProfile(
 	providerConfig: LdapProviderConfig,
 	input: {
 		ctx: LdapEndpointContext
-		password: string
 		username: string
+		password: string
 	},
 ): Promise<LdapUserProfile> {
 	let adminClient: Client | undefined

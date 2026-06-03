@@ -1,6 +1,7 @@
 import type { GenericEndpointContext } from 'better-auth'
 import type { ClientOptions, Entry, Filter, SearchOptions } from 'ldapts'
 import type { LdapUserProfile } from './ldap'
+import { escapeRdnValue } from './utils/escape'
 
 type Awaitable<T> = T | Promise<T>
 
@@ -16,20 +17,19 @@ export interface LdapUserInfo extends Record<string, unknown> {
 	image?: string | null | undefined
 }
 
-export interface LdapRuntimeCredentials {
+export interface LdapResolverInput {
 	providerId: string
 	username: string
-	password: string
 	ctx: LdapEndpointContext
 }
 
-export interface LdapUserDnResolverInput extends Omit<LdapRuntimeCredentials, 'password'> {}
+export interface LdapUserDnResolverInput extends LdapResolverInput {}
 
-export interface LdapUserSearchResolverInput extends LdapRuntimeCredentials {
+export interface LdapUserSearchResolverInput extends LdapResolverInput {
 	userDn?: string | undefined
 }
 
-export interface LdapGroupSearchResolverInput extends LdapRuntimeCredentials {
+export interface LdapGroupSearchResolverInput extends LdapResolverInput {
 	userDn: string
 	profile: LdapUserProfile
 }
@@ -145,11 +145,7 @@ export async function resolveOptionalUserDn(
 	}
 
 	return typeof userDn === 'function'
-		? await userDn({
-				ctx: input.ctx,
-				providerId: providerConfig.providerId,
-				username: input.username,
-			})
+		? await userDn(createUserDnResolverInput(providerConfig, input))
 		: userDn
 }
 
@@ -161,11 +157,7 @@ export async function resolveRequiredUserDn(
 	},
 ): Promise<string> {
 	const userDn = typeof providerConfig.ldap.user.dn === 'function'
-		? await providerConfig.ldap.user.dn({
-				ctx: input.ctx,
-				providerId: providerConfig.providerId,
-				username: input.username,
-			})
+		? await providerConfig.ldap.user.dn(createUserDnResolverInput(providerConfig, input))
 		: providerConfig.ldap.user.dn
 
 	if (!userDn) {
@@ -228,17 +220,29 @@ export function createUserSearchResolverInput(
 	providerConfig: LdapProviderConfig,
 	input: {
 		ctx: LdapEndpointContext
-		password: string
 		username: string
 	},
 	userDn?: string,
 ): LdapUserSearchResolverInput {
 	return {
 		ctx: input.ctx,
-		password: input.password,
 		providerId: providerConfig.providerId,
-		username: input.username,
+		username: escapeRdnValue(input.username),
 		userDn,
+	}
+}
+
+function createUserDnResolverInput(
+	providerConfig: LdapProviderConfig,
+	input: {
+		ctx: LdapEndpointContext
+		username: string
+	},
+): LdapUserDnResolverInput {
+	return {
+		ctx: input.ctx,
+		providerId: providerConfig.providerId,
+		username: escapeRdnValue(input.username),
 	}
 }
 
