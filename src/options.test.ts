@@ -90,6 +90,37 @@ describe('options helpers', () => {
 		})).toBeUndefined()
 	})
 
+	it('escapes username before passing it to the admin user.dn resolver', async () => {
+		let resolvedUsername: string | undefined
+		const providerConfig = createAdminProviderConfig({
+			ldap: {
+				connection: {
+					startTLS: true,
+					tlsOptions: {
+						rejectUnauthorized: false,
+					},
+					url: 'ldap://ldap.example.com',
+				},
+				admin: {
+					dn: 'cn=read-only-admin,dc=example,dc=com',
+					password: 'admin-password',
+				},
+				user: {
+					dn: ({ username }) => {
+						resolvedUsername = username
+						return `uid=${username},ou=people,dc=example,dc=com`
+					},
+				},
+			},
+		})
+
+		expect(await resolveOptionalUserDn(providerConfig, {
+			ctx,
+			username: 'mark,admin',
+		})).toBe('uid=mark\\,admin,ou=people,dc=example,dc=com')
+		expect(resolvedUsername).toBe('mark\\,admin')
+	})
+
 	it('resolves required user.dn for self auth and rejects missing results', async () => {
 		const providerConfig = createSelfProviderConfig()
 		const providerConfigWithoutResolvedDn = createSelfProviderConfig({
@@ -120,13 +151,38 @@ describe('options helpers', () => {
 		})).rejects.toThrow('LDAP user.dn is required')
 	})
 
+	it('escapes username before passing it to the self user.dn resolver', async () => {
+		let resolvedUsername: string | undefined
+		const providerConfig = createSelfProviderConfig({
+			ldap: {
+				connection: {
+					tlsOptions: {
+						rejectUnauthorized: false,
+					},
+					url: 'ldaps://ldap.example.com',
+				},
+				user: {
+					dn: ({ username }) => {
+						resolvedUsername = username
+						return `uid=${username},ou=people,dc=example,dc=com`
+					},
+				},
+			},
+		})
+
+		expect(await resolveRequiredUserDn(providerConfig, {
+			ctx,
+			username: 'mark,admin',
+		})).toBe('uid=mark\\,admin,ou=people,dc=example,dc=com')
+		expect(resolvedUsername).toBe('mark\\,admin')
+	})
+
 	it('resolves user search baseDn from resolver input, fallback values, and throws when missing', async () => {
 		const providerConfig = createSelfProviderConfig()
 		const resolverInput = createUserSearchResolverInput(
 			providerConfig,
 			{
 				ctx,
-				password: 'password',
 				username: 'mark',
 			},
 			'uid=mark,ou=people,dc=example,dc=com',
@@ -156,7 +212,6 @@ describe('options helpers', () => {
 			providerConfig,
 			{
 				ctx,
-				password: 'password',
 				username: 'mark',
 			},
 			'uid=mark,ou=people,dc=example,dc=com',
@@ -191,7 +246,6 @@ describe('options helpers', () => {
 			providerConfig,
 			{
 				ctx,
-				password: 'password',
 				username: 'mark',
 			},
 			'uid=mark,ou=people,dc=example,dc=com',
@@ -199,7 +253,6 @@ describe('options helpers', () => {
 
 		expect(resolverInput).toEqual({
 			ctx,
-			password: 'password',
 			providerId: 'corp',
 			userDn: 'uid=mark,ou=people,dc=example,dc=com',
 			username: 'mark',

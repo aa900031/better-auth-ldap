@@ -72,15 +72,15 @@ export function signInWithLdap(
 
 			const profile = await authenticateLdapUserProfile(providerConfig, {
 				ctx,
-				password: ctx.body.password,
 				username: ctx.body.username,
+				password: ctx.body.password,
 			})
 
 			const userInfo = await mapProfileToUser(providerConfig, {
 				ctx,
 				profile,
-				providerId: providerConfig.providerId,
 				username: ctx.body.username,
+				providerId: providerConfig.providerId,
 			})
 
 			const result = await handleOAuthUserInfo(ctx, {
