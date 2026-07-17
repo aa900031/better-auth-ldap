@@ -1,6 +1,7 @@
 ignoreWorkspaceRootCheck: true
 minimumReleaseAgeExclude:
   - '@aa900031/tsdown-config@0.2.1'
+  - '@aa900031/eslint-config@8.0.0'
 shamefullyHoist: true
 shellEmulator: true
 strictPeerDependencies: false
