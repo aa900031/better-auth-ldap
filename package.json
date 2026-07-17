@@ -2,7 +2,7 @@
 	"name": "better-auth-ldap",
 	"type": "module",
 	"version": "0.1.1",
-	"packageManager": "pnpm@11.4.0",
+	"packageManager": "pnpm@11.11.0",
 	"description": "LDAP sign-in plugin for Better Auth.",
 	"author": "zhong666 <hi@zhong666.me>",
 	"license": "MIT",
