@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       ldapts:
-        specifier: ^8.1.8
-        version: 8.1.8
+        specifier: ^8.2.0
+        version: 8.2.0
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -1388,10 +1388,6 @@ packages:
     resolution: {integrity: sha512-aRDkn3uyIlCFfk5NUA+VdwMmMsh8JGhc4hapfV4yxymHGQ3BVskMQfoXGpCo5IoBuQ9tS5iiVKhCpTcB4pW4qw==}
     engines: {node: '>= 12.0.0'}
 
-  comment-parser@1.4.6:
-    resolution: {integrity: sha512-ObxuY6vnbWTN6Od72xfwN9DbzC7Y2vv8u1Soi9ahRKL37gb6y1qk6/dgjs+3JWuXJHWvsg3BXIwzd/rkmAwavg==}
-    engines: {node: '>= 12.0.0'}
-
   comment-parser@1.4.7:
     resolution: {integrity: sha512-0h+uSNtQGW3D98eQt3jJ8L06Fves8hncB4V/PKdw/Qb8Hnk19VaKuTr55UNRYiSoVa7WwrFls+rh3ux9agmkeQ==}
     engines: {node: '>= 12.0.0'}
@@ -2101,8 +2097,8 @@ packages:
     resolution: {integrity: sha512-nbD8lB9EB3wNdMhOCdx5Li8DxnLbvKByylRLcJ1h+4SkrowVeECAyZlyiKMThF7xFdRz0jSQ2MoJr+wXux2y0Q==}
     engines: {node: '>=20.0.0'}
 
-  ldapts@8.1.8:
-    resolution: {integrity: sha512-Wpdvo+/0DREIynYf2he2efHtjptr5zD7dpesSkZWJqfQdMEgSTytEIsSZVuoDSiiE1+SpXf3emZ7ewxGBTo7Pw==}
+  ldapts@8.2.0:
+    resolution: {integrity: sha512-XfKocadpoHc1kNgtbTBBhD+pSh1U9KVTzxcKwDS4ulFFyC7rJkLC3TwIfbQ4rt3my9KHz8qsw9qFXVjcPOGebw==}
     engines: {node: '>=20'}
 
   levn@0.4.1:
@@ -4344,8 +4340,6 @@ snapshots:
 
   comment-parser@1.4.5: {}
 
-  comment-parser@1.4.6: {}
-
   comment-parser@1.4.7: {}
 
   compare-func@2.0.0:
@@ -4645,7 +4639,7 @@ snapshots:
     dependencies:
       '@eslint-community/eslint-utils': 4.9.1(eslint@10.7.0(jiti@2.7.0))
       '@eslint-community/regexpp': 4.12.2
-      comment-parser: 1.4.6
+      comment-parser: 1.4.7
       eslint: 10.7.0(jiti@2.7.0)
       jsdoc-type-pratt-parser: 7.2.0
       refa: 0.12.1
@@ -5055,7 +5049,7 @@ snapshots:
 
   kysely@0.28.17: {}
 
-  ldapts@8.1.8:
+  ldapts@8.2.0:
     dependencies:
       strict-event-emitter-types: 2.0.0
 

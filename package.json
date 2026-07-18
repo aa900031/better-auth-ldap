@@ -63,7 +63,7 @@
 		"better-auth": "^1.5.0"
 	},
 	"dependencies": {
-		"ldapts": "^8.1.8",
+		"ldapts": "^8.2.0",
 		"zod": "^4.4.3"
 	},
 	"devDependencies": {
