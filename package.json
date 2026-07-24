@@ -76,7 +76,7 @@
 		"better-auth": "^1.6.23",
 		"eslint": "^10.7.0",
 		"release-it": "^20.2.1",
-		"tsdown": "^0.22.8",
+		"tsdown": "^0.22.9",
 		"typescript": "^5.9.3",
 		"vitest": "^4.1.10"
 	}
