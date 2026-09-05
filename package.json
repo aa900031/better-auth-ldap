@@ -63,8 +63,8 @@
 		"better-auth": "^1.5.0"
 	},
 	"dependencies": {
-		"ldapts": "^8.1.8",
-		"zod": "^4.4.3"
+		"ldapts": "^8.2.0",
+		"zod": "^4.5.4"
 	},
 	"devDependencies": {
 		"@aa900031/eslint-config": "^8.0.3",
