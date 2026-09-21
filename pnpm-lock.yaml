@@ -9,10 +9,10 @@ importers:
   .:
     dependencies:
       ldapts:
-        specifier: ^8.1.8
-        version: 8.1.8
+        specifier: ^8.2.0
+        version: 8.2.0
       zod:
-        specifier: ^4.4.3
+        specifier: ^4.6.5
         version: 4.6.5
     devDependencies:
       '@aa900031/eslint-config':
@@ -2152,8 +2152,8 @@ packages:
     resolution: {integrity: sha512-nbD8lB9EB3wNdMhOCdx5Li8DxnLbvKByylRLcJ1h+4SkrowVeECAyZlyiKMThF7xFdRz0jSQ2MoJr+wXux2y0Q==}
     engines: {node: '>=20.0.0'}
 
-  ldapts@8.1.8:
-    resolution: {integrity: sha512-Wpdvo+/0DREIynYf2he2efHtjptr5zD7dpesSkZWJqfQdMEgSTytEIsSZVuoDSiiE1+SpXf3emZ7ewxGBTo7Pw==}
+  ldapts@8.2.0:
+    resolution: {integrity: sha512-XfKocadpoHc1kNgtbTBBhD+pSh1U9KVTzxcKwDS4ulFFyC7rJkLC3TwIfbQ4rt3my9KHz8qsw9qFXVjcPOGebw==}
     engines: {node: '>=20'}
 
   levn@0.4.1:
@@ -5196,7 +5196,7 @@ snapshots:
 
   kysely@0.28.17: {}
 
-  ldapts@8.1.8:
+  ldapts@8.2.0:
     dependencies:
       strict-event-emitter-types: 2.0.0
 
