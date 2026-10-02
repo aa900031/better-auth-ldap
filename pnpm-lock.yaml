@@ -34,7 +34,7 @@ importers:
         specifier: ^4.1.11
         version: 4.1.11(vitest@4.1.11)
       better-auth:
-        specifier: ^1.7.5
+        specifier: ^1.7.6
         version: 1.7.6(vitest@4.1.11)
       eslint:
         specifier: ^10.11.0
