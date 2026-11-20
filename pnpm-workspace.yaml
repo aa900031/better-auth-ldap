@@ -1,16 +1,20 @@
 ignoreWorkspaceRootCheck: true
+
+minimumReleaseAgeExcludePrune: true
 minimumReleaseAgeExclude:
   - '@aa900031/tsdown-config@0.2.1'
   - '@aa900031/eslint-config@8.0.0'
-shamefullyHoist: true
-shellEmulator: true
-strictPeerDependencies: false
+
 trustPolicy: no-downgrade
 trustPolicyIgnoreAfter: 43200
-autoInstallPeers: false
 
 trustPolicyExclude:
   - tinyexec@1.2.2 # https://github.com/tinylibs/tinyexec/issues/136
+
+autoInstallPeers: false
+strictPeerDependencies: false
+shamefullyHoist: true
+shellEmulator: true
 
 allowBuilds:
   esbuild: true
